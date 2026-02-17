@@ -10,17 +10,25 @@ function CardDetailPage() {
   useEffect(() => {
     const fetchCard = async () => {
       try {
-        const data = await cardService.getCardById(cardId);
-        setCard(data);
+        console.log('cardId from URL:', cardId); // 👈 DEBUG HERE
+        const response = await cardService.getCardById(Number(cardId));
+        const resolvedCard =
+          response?.card ||
+          response?.data ||
+          response;
+  
+        setCard(resolvedCard ?? null);
       } catch (error) {
         console.error('Error fetching card:', error);
+        setCard(null);
       } finally {
         setLoading(false);
       }
     };
-
+  
     fetchCard();
   }, [cardId]);
+  
 
   if (loading) {
     return <div className="loading">Loading card...</div>;
@@ -33,7 +41,7 @@ function CardDetailPage() {
   return (
     <div className="card-detail-page">
       <div className="card-detail-container card">
-        <div className="card-image-section">
+        <div className="card-image-section">  
           <img src={card.imageUrl} alt={card.name} />
         </div>
 

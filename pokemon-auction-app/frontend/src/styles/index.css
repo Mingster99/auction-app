@@ -1,94 +1,175 @@
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+/* ============================================================
+   INDEX.CSS - Global Styles
+   ============================================================
+   This file has THREE sections:
+   
+   1. @tailwind directives - loads Tailwind's CSS
+   2. @layer base - resets and base HTML element styles
+   3. @layer components - reusable component classes
+   
+   Most styling is done with Tailwind classes directly in JSX.
+   This file only contains things that can't be done with classes.
+   ============================================================ */
+
+/* ── TAILWIND DIRECTIVES ── */
+/* These three lines import all of Tailwind's CSS */
+@tailwind base;       /* CSS reset + base styles */
+@tailwind components; /* Component classes */
+@tailwind utilities;  /* Utility classes like bg-gray-900, text-white, etc. */
+
+/* ── CUSTOM GOOGLE FONTS ── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+/* ── BASE STYLES ── */
+/* @layer base = lowest priority, base HTML element styles */
+@layer base {
+  * {
+    @apply border-gray-800; /* Default border color */
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html {
+    scroll-behavior: smooth; /* Smooth scroll when clicking anchor links */
+  }
+
+  body {
+    @apply bg-gray-950 text-white antialiased;
+    /* 
+      bg-gray-950 = very dark background
+      text-white = default white text
+      antialiased = smoother font rendering
+    */
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    min-height: 100vh;
+  }
+
+  /* Style scrollbar to match dark theme */
+  ::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-gray-950;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-gray-700 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-600;
+  }
+
+  /* Remove default list styles */
+  ul, ol {
+    list-style: none;
+  }
+
+  /* Remove default link underlines */
+  a {
+    text-decoration: none;
+  }
+
+  /* Make images responsive by default */
+  img {
+    max-width: 100%;
+    height: auto;
+  }
 }
 
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  background-color: #f5f5f5;
+/* ── COMPONENT CLASSES ── */
+/* @layer components = reusable patterns */
+/* Use these with @apply to avoid repeating Tailwind classes */
+@layer components {
+
+  /* Standard card container */
+  .card-container {
+    @apply bg-gray-900 border border-gray-800 rounded-2xl;
+  }
+
+  /* Standard section padding */
+  .section {
+    @apply max-w-7xl mx-auto px-6 py-20;
+  }
+
+  /* Gradient text effect */
+  .gradient-text {
+    @apply bg-gradient-to-r from-violet-400 to-blue-400 bg-clip-text text-transparent;
+  }
+
+  /* Input field base styles */
+  .input-field {
+    @apply w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm
+           placeholder-gray-600
+           focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20
+           transition-all;
+  }
+
+  /* Primary button */
+  .btn-primary {
+    @apply bg-violet-600 hover:bg-violet-500 text-white px-6 py-3 rounded-xl font-bold
+           transition-all hover:scale-105 hover:shadow-lg hover:shadow-violet-500/25;
+  }
+
+  /* Secondary button */
+  .btn-secondary {
+    @apply bg-gray-800 hover:bg-gray-700 border border-gray-700 text-white px-6 py-3 rounded-xl font-bold
+           transition-all hover:scale-105;
+  }
+
+  /* Ghost button */
+  .btn-ghost {
+    @apply text-gray-400 hover:text-white px-4 py-2 rounded-xl transition-colors;
+  }
+
+  /* Error message */
+  .error-message {
+    @apply flex items-center gap-3 bg-red-500/10 border border-red-500/20 text-red-400
+           px-4 py-3 rounded-xl text-sm;
+  }
+
+  /* Success message */
+  .success-message {
+    @apply flex items-center gap-3 bg-green-500/10 border border-green-500/20 text-green-400
+           px-4 py-3 rounded-xl text-sm;
+  }
+
+  /* LIVE badge */
+  .live-badge {
+    @apply flex items-center gap-1.5 bg-red-600 text-white text-xs font-bold px-3 py-1.5 rounded-full;
+  }
+
+  /* Page container */
+  .page {
+    @apply min-h-screen bg-gray-950;
+  }
 }
 
-.app {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-}
+/* ── UTILITY OVERRIDES ── */
+/* @layer utilities = highest priority, can override everything */
+@layer utilities {
+  
+  /* Backdrop blur for glass effect */
+  .glass {
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    background: rgba(17, 24, 39, 0.8);
+  }
 
-.main-content {
-  flex: 1;
-  padding: 20px;
-  max-width: 1200px;
-  margin: 0 auto;
-  width: 100%;
-}
+  /* Gradient border effect */
+  .border-gradient {
+    border: 1px solid transparent;
+    background-clip: padding-box;
+    background-image: linear-gradient(to right, #7c3aed, #3b82f6);
+  }
 
-/* Utility classes */
-.container {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 20px;
-}
-
-.btn {
-  padding: 10px 20px;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 16px;
-  transition: all 0.3s ease;
-}
-
-.btn-primary {
-  background-color: #3b82f6;
-  color: white;
-}
-
-.btn-primary:hover {
-  background-color: #2563eb;
-}
-
-.btn-secondary {
-  background-color: #6b7280;
-  color: white;
-}
-
-.btn-secondary:hover {
-  background-color: #4b5563;
-}
-
-.card {
-  background: white;
-  border-radius: 8px;
-  padding: 20px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.input {
-  width: 100%;
-  padding: 10px;
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
-  font-size: 16px;
-}
-
-.input:focus {
-  outline: none;
-  border-color: #3b82f6;
-}
-
-.error {
-  color: #ef4444;
-  font-size: 14px;
-  margin-top: 5px;
-}
-
-.loading {
-  text-align: center;
-  padding: 40px;
-  color: #6b7280;
+  /* Text gradient shorthand */
+  .text-gradient {
+    background: linear-gradient(135deg, #a78bfa, #60a5fa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
 }
