@@ -1,20 +1,16 @@
 const express = require('express');
 const router = express.Router();
 const authMiddleware = require('../../middleware/auth.middleware');
+const streamsController = require('./streams.controller');
 
-// GET /api/streams/active - Get all active streams
-router.get('/active', async (req, res) => {
-  res.json([]);
-});
+// Public routes
+router.get('/active', streamsController.getActiveStreams);
+router.get('/:id', streamsController.getStreamById);
 
-// GET /api/streams/:id - Get stream by ID
-router.get('/:id', async (req, res) => {
-  res.json({ message: 'Get stream by ID - Coming soon' });
-});
-
-// POST /api/streams - Create new stream (protected)
-router.post('/', authMiddleware, async (req, res) => {
-  res.json({ message: 'Create stream - Coming soon' });
-});
+// Protected routes (require authentication)
+router.post('/', authMiddleware, streamsController.createStream);
+router.post('/:id/start', authMiddleware, streamsController.startStream);
+router.post('/:id/join', authMiddleware, streamsController.joinStream);
+router.post('/:id/end', authMiddleware, streamsController.endStream);
 
 module.exports = router;

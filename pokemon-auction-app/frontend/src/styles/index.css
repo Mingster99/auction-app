@@ -136,14 +136,74 @@
            px-4 py-3 rounded-xl text-sm;
   }
 
-  /* LIVE badge */
+  /* LIVE badge (Agora style) */
   .live-badge {
-    @apply flex items-center gap-1.5 bg-red-600 text-white text-xs font-bold px-3 py-1.5 rounded-full;
+    background: red;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-weight: bold;
   }
 
   /* Page container */
   .page {
     @apply min-h-screen bg-gray-950;
+  }
+
+  /* Agora streaming layout */
+  .stream-host-page,
+  .stream-viewer-page {
+    padding: 20px;
+  }
+
+  .video-preview,
+  .video-player-container {
+    position: relative;
+    width: 100%;
+    max-width: 1280px;
+    aspect-ratio: 16 / 9;
+    background: #000;
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 20px;
+  }
+
+  .video-player {
+    width: 100%;
+    height: 100%;
+  }
+
+  .video-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: white;
+  }
+
+  .stream-controls {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+  }
+
+  .stream-container {
+    display: grid;
+    grid-template-columns: 1fr 300px;
+    gap: 20px;
+  }
+
+  .stream-sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  @media (max-width: 768px) {
+    .stream-container {
+      grid-template-columns: 1fr;
+    }
   }
 }
 

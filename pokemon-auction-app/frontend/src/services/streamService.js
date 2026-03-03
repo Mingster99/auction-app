@@ -19,9 +19,15 @@ export const streamService = {
     return response.data;
   },
 
-  // Start livestream
+  // Start livestream (go live)
   startStream: async (streamId) => {
     const response = await api.post(`/streams/${streamId}/start`);
+    return response.data;
+  },
+
+  // Join stream as viewer (get Agora token)
+  joinStream: async (streamId) => {
+    const response = await api.post(`/streams/${streamId}/join`);
     return response.data;
   },
 

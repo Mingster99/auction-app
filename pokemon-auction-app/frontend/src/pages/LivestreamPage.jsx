@@ -1,132 +1,160 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { useAgora } from '../hooks/useAgora';
 import { streamService } from '../services/streamService';
-import { useWebSocket } from '../hooks/useWebSocket';
 
-function LivestreamPage() {
-  const { streamId } = useParams();
+function StreamViewer() {
+  // Route is defined as /livestream/:id in App.jsx
+  const { id } = useParams();
+  const streamId = id;
   const [stream, setStream] = useState(null);
+  const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
-  const { connected, messages, currentBid, sendMessage, placeBid } = useWebSocket(streamId);
-  const [chatMessage, setChatMessage] = useState('');
-  const [bidAmount, setBidAmount] = useState('');
+  const [joined, setJoined] = useState(false);
+  
+  const remoteVideoRef = useRef(null);
+  
+  const {
+    joinAsViewer,
+    leave,
+    remoteUsers,
+    isJoined
+  } = useAgora();
 
+  // Fetch stream info
   useEffect(() => {
     const fetchStream = async () => {
       try {
         const data = await streamService.getStreamById(streamId);
         setStream(data);
-      } catch (error) {
-        console.error('Error fetching stream:', error);
+
+        // Auto-join if stream is live
+        if (data.status === 'live') {
+          await handleJoinStream();
+        }
+      } catch (err) {
+        console.error('Failed to fetch stream:', err);
+        setError('Stream not found or no longer available');
       } finally {
         setLoading(false);
       }
     };
 
     fetchStream();
+
+    return () => {
+      leave();
+    };
   }, [streamId]);
 
-  const handleSendMessage = (e) => {
-    e.preventDefault();
-    if (chatMessage.trim()) {
-      sendMessage(chatMessage);
-      setChatMessage('');
+  // Play remote video when user is available
+  useEffect(() => {
+    if (remoteUsers.length > 0 && remoteVideoRef.current) {
+      const remoteUser = remoteUsers[0];
+      if (remoteUser.videoTrack) {
+        remoteUser.videoTrack.play(remoteVideoRef.current);
+      }
+    }
+  }, [remoteUsers]);
+
+  const handleJoinStream = async () => {
+    setError('');
+    setLoading(true);
+
+    try {
+      // Get Agora credentials from backend
+      const response = await streamService.joinStream(streamId);
+      const { channelName, agora } = response;
+
+      console.log('Joining stream:', channelName);
+
+      // Join Agora channel as viewer
+      await joinAsViewer(channelName, agora.token, agora.uid);
+
+      setJoined(true);
+      console.log('Joined stream successfully');
+    } catch (err) {
+      console.error('Failed to join stream:', err);
+      setError(err.response?.data?.message || 'Failed to join stream');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handlePlaceBid = (e) => {
-    e.preventDefault();
-    const amount = parseFloat(bidAmount);
-    if (amount && stream?.currentCard) {
-      placeBid(stream.currentCard.id, amount);
-      setBidAmount('');
-    }
-  };
-
-  if (loading) {
+  if (loading && !stream) {
     return <div className="loading">Loading stream...</div>;
   }
 
+  if (error && !stream) {
+    return <div className="error-page card"><h2>Error</h2><p>{error}</p></div>;
+  }
+
   if (!stream) {
-    return <div className="error">Stream not found</div>;
+    return <div className="error-page card"><p>Stream not found</p></div>;
+  }
+
+  // Stream is not live yet
+  if (stream.status !== 'live') {
+    return (
+      <div className="stream-viewer-page">
+        <div className="stream-offline card">
+          <h2>{stream.title}</h2>
+          <p>This stream is currently offline.</p>
+          <p>Host: {stream.host_name}</p>
+          <p>Status: {stream.status}</p>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="livestream-page">
-      <div className="stream-layout">
-        {/* Video Player */}
-        <div className="video-section card">
-          <div className="video-player">
-            {/* Video player component will go here */}
-            <div className="video-placeholder">
-              <p>📹 Video Player</p>
-              <p className={connected ? 'status-online' : 'status-offline'}>
-                {connected ? '🟢 Connected' : '🔴 Disconnected'}
-              </p>
-            </div>
-          </div>
+    <div className="stream-viewer-page">
+      <div className="stream-container">
+        <div className="video-section">
+          <h2>🔴 LIVE: {stream.title}</h2>
           
-          <div className="stream-info">
-            <h2>{stream.title}</h2>
-            <p>Host: {stream.hostName}</p>
-            <p>Viewers: {stream.viewerCount}</p>
-          </div>
-        </div>
-
-        {/* Sidebar */}
-        <div className="sidebar">
-          {/* Current Auction */}
-          <div className="auction-section card">
-            <h3>Current Auction</h3>
-            {stream.currentCard ? (
-              <>
-                <img src={stream.currentCard.imageUrl} alt={stream.currentCard.name} />
-                <h4>{stream.currentCard.name}</h4>
-                <p>{stream.currentCard.set}</p>
-                <p className="current-bid">
-                  Current Bid: ${currentBid?.amount || stream.currentCard.startingBid}
-                </p>
-                
-                <form onSubmit={handlePlaceBid}>
-                  <input
-                    type="number"
-                    className="input"
-                    placeholder="Enter bid amount"
-                    value={bidAmount}
-                    onChange={(e) => setBidAmount(e.target.value)}
-                    min={currentBid?.amount || stream.currentCard.startingBid}
-                    step="0.01"
-                  />
-                  <button type="submit" className="btn btn-primary">
-                    Place Bid
-                  </button>
-                </form>
-              </>
+          {/* Remote video player */}
+          <div className="video-player-container">
+            {remoteUsers.length > 0 ? (
+              <div ref={remoteVideoRef} className="video-player" />
             ) : (
-              <p>No active auction</p>
+              <div className="video-placeholder">
+                <p>Waiting for host to start broadcasting...</p>
+                {isJoined && <p>✅ Connected to stream</p>}
+              </div>
             )}
           </div>
 
-          {/* Chat */}
-          <div className="chat-section card">
+          {/* Stream info */}
+          <div className="stream-details">
+            <p><strong>Host:</strong> {stream.host_name}</p>
+            <p><strong>Viewers:</strong> {stream.viewer_count || 0}</p>
+            {stream.description && <p>{stream.description}</p>}
+          </div>
+
+          {error && <div className="error">{error}</div>}
+
+          {!joined && (
+            <button 
+              onClick={handleJoinStream} 
+              className="btn btn-primary"
+              disabled={loading}
+            >
+              {loading ? 'Joining...' : 'Join Stream'}
+            </button>
+          )}
+        </div>
+
+        {/* Sidebar for chat/bidding (you can add this later) */}
+        <div className="stream-sidebar">
+          <div className="card">
             <h3>Chat</h3>
-            <div className="chat-messages">
-              {messages.map((msg, index) => (
-                <div key={index} className="chat-message">
-                  <strong>{msg.username}:</strong> {msg.message}
-                </div>
-              ))}
-            </div>
-            <form onSubmit={handleSendMessage}>
-              <input
-                type="text"
-                className="input"
-                placeholder="Type a message..."
-                value={chatMessage}
-                onChange={(e) => setChatMessage(e.target.value)}
-              />
-              <button type="submit" className="btn btn-primary">Send</button>
-            </form>
+            <p>Chat coming soon...</p>
+          </div>
+          
+          <div className="card">
+            <h3>Current Auction</h3>
+            <p>Bidding panel coming soon...</p>
           </div>
         </div>
       </div>
@@ -134,4 +162,4 @@ function LivestreamPage() {
   );
 }
 
-export default LivestreamPage;
+export default StreamViewer;

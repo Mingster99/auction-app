@@ -13,7 +13,8 @@ import SignupPage from './pages/SignupPage';
 import ProfilePage from './pages/ProfilePage';
 import LivestreamPage from './pages/LivestreamPage';
 import CardDetailPage from './pages/CardDetailPage';
-import ListCardPage from './pages/ListCardPage'; // ← NEW
+import ListCardPage from './pages/ListCardPage';
+import StreamHostPage from './pages/StreamHostPage';
 
 // ============================================================
 // APP.JSX - The Root Component
@@ -67,6 +68,8 @@ function App() {
               {/* Stream routes */}
               {/* :id means any value - accessible as params.id in component */}
               <Route path="/livestream/:id" element={<LivestreamPage />} />
+
+              <Route path="/stream/host" element={<StreamHostPage />} />
 
               {/* 404 - catches any unmatched routes */}
               <Route path="*" element={
