@@ -31,7 +31,7 @@ const agoraService = {
     const currentTimestamp = Math.floor(Date.now() / 1000);
     const privilegeExpiredTs = currentTimestamp + expirationTimeInSeconds;
 
-    // Ternary operator is used to determine the role of the user, cleaner if else statement
+    // Determine role
     const agoraRole = role === 'publisher' ? RtcRole.PUBLISHER : RtcRole.SUBSCRIBER;
 
     // Build token

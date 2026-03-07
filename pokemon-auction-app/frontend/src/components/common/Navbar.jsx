@@ -41,7 +41,7 @@ function Navbar() {
             to="/"
             className="font-black text-xl bg-gradient-to-r from-violet-400 to-blue-400 bg-clip-text text-transparent hover:opacity-80 transition-opacity"
           >
-            PokéAuctions
+            Vaultive Auctions
           </Link>
 
           {/* ── DESKTOP NAV LINKS ── */}

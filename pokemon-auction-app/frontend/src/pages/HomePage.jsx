@@ -61,7 +61,7 @@ function HomePage() {
             {/* Main heading */}
             <h1 className="text-5xl md:text-7xl font-black mb-6 leading-tight">
               <span className="bg-gradient-to-r from-violet-400 via-purple-300 to-blue-400 bg-clip-text text-transparent">
-                Pokémon Card
+                Vaultive
               </span>
               <br />
               <span className="text-white">Auctions</span>
