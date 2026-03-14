@@ -1,78 +1,89 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { useAgora } from '../hooks/useAgora';
-import { streamService } from '../services/streamService';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useLiveKit } from '../hooks/useLiveKit';
+import { streamService } from '../services/streamService';
 
 function StreamHost() {
   const { user } = useAuth();
-  const [streamTitle, setStreamTitle] = useState('');
-  const [streamDescription, setStreamDescription] = useState('');
-  const [streamId, setStreamId] = useState(null);
-  const [isLive, setIsLive] = useState(false);
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  
-  const videoRef = useRef(null);
   const navigate = useNavigate();
-  
+  const videoRef = useRef(null);
+
+  // LiveKit hook (replaces useAgora)
   const {
+    isJoined,
+    isPublishing,
+    isMicMuted,
+    isCameraMuted,
+    localVideoTrack,
+    error: livekitError,
     joinAsHost,
     leave,
     toggleMic,
     toggleCamera,
-    localTracks,
-    isJoined
-  } = useAgora();
+  } = useLiveKit();
 
-  // On mount, if user already has a live stream, allow resuming it
+  // Stream state
+  const [streamId, setStreamId] = useState(null);
+  const [streamTitle, setStreamTitle] = useState('');
+  const [streamDescription, setStreamDescription] = useState('');
+  const [streamStatus, setStreamStatus] = useState('idle');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  // Check for existing live stream on mount
   useEffect(() => {
     const checkExistingStream = async () => {
       try {
-        const activeStreams = await streamService.getActiveStreams();
-        if (!Array.isArray(activeStreams) || !user) return;
-
-        // Find a live stream hosted by the current user
-        const myLiveStream = activeStreams.find(
-          (s) => s.host_name === user.username
+        const response = await streamService.getActiveStreams();
+        const streams = response.data || response;
+        const myStream = streams.find(
+          (s) => s.host_name === user?.username && s.status === 'live'
         );
-
-        if (myLiveStream) {
-          setStreamId(myLiveStream.id);
-          setStreamTitle(myLiveStream.title);
-          setIsLive(true);
+        if (myStream) {
+          setStreamId(myStream.id);
+          setStreamTitle(myStream.title);
+          setStreamStatus('live');
         }
       } catch (err) {
-        console.error('Failed to check existing streams', err);
+        console.log('No existing stream found');
       }
     };
-
-    checkExistingStream();
+    if (user) checkExistingStream();
   }, [user]);
 
   // Play local video when track is available
   useEffect(() => {
-    if (localTracks.videoTrack && videoRef.current) {
-      localTracks.videoTrack.play(videoRef.current);
+    if (localVideoTrack && videoRef.current) {
+      localVideoTrack.attach(videoRef.current);
+      return () => {
+        localVideoTrack.detach(videoRef.current);
+      };
     }
-  }, [localTracks.videoTrack]);
+  }, [localVideoTrack]);
 
+  // Create Stream
   const handleCreateStream = async (e) => {
     e.preventDefault();
-    setError('');
+    if (!streamTitle.trim()) {
+      setError('Please enter a stream title');
+      return;
+    }
+
     setLoading(true);
+    setError('');
 
     try {
-      // Create stream in database
-      const stream = await streamService.createStream({
+      const response = await streamService.createStream({
         title: streamTitle,
-        description: streamDescription
+        description: streamDescription,
       });
-      
-      // Support different possible id field names from backend
-      const createdStreamId = stream.id ?? stream.stream_id ?? stream.streamId;
-      console.log('Stream created:', stream, 'using id:', createdStreamId);
-      setStreamId(createdStreamId);
+
+      const stream = response.data || response;
+      const newId = stream.id || stream.streamId;
+      setStreamId(newId);
+      setStreamStatus('created');
+      console.log('✅ Stream created:', newId);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to create stream');
     } finally {
@@ -80,163 +91,174 @@ function StreamHost() {
     }
   };
 
+  // Go Live
   const handleGoLive = async () => {
-    setError('');
+    if (!streamId) return;
     setLoading(true);
+    setError('');
 
     try {
-      // Start stream and get Agora credentials
       const response = await streamService.startStream(streamId);
-      const { channelName, agora } = response;
+      const data = response.data || response;
+      const { token, wsUrl } = data.livekit;
 
-      console.log('Starting stream:', channelName);
+      console.log('🔑 Got LiveKit credentials, connecting...');
+      await joinAsHost(wsUrl, token);
 
-      // Join Agora channel as host
-      await joinAsHost(channelName, agora.token, agora.uid);
-
-      setIsLive(true);
-      console.log('Stream is now live!');
+      setStreamStatus('live');
+      console.log('✅ Now live!');
     } catch (err) {
-      console.error('Failed to go live:', err);
-      setError(err.response?.data?.message || 'Failed to start stream');
+      setError(err.response?.data?.message || 'Failed to go live');
+      console.error('❌ Go live failed:', err);
     } finally {
       setLoading(false);
     }
   };
 
+  // End Stream
   const handleEndStream = async () => {
     try {
-      // Leave Agora channel
       await leave();
-
-      // End stream in database
-      if (streamId) {
-        await streamService.endStream(streamId);
-      }
-
-      setIsLive(false);
+      await streamService.endStream(streamId);
+      setStreamStatus('idle');
+      setStreamId(null);
       navigate('/');
     } catch (err) {
-      console.error('Failed to end stream:', err);
-      setError('Failed to end stream');
+      console.error('Error ending stream:', err);
     }
   };
 
-  const handleToggleMic = async () => {
-    const enabled = await toggleMic();
-    console.log('Microphone:', enabled ? 'ON' : 'OFF');
-  };
+  const handleToggleMic = async () => await toggleMic();
+  const handleToggleCamera = async () => await toggleCamera();
 
-  const handleToggleCamera = async () => {
-    const enabled = await toggleCamera();
-    console.log('Camera:', enabled ? 'ON' : 'OFF');
-  };
+  return (
+    <div className="min-h-screen bg-[#0f1419] text-white p-6">
+      <div className="max-w-4xl mx-auto">
+        <h1 className="text-3xl font-black mb-6">
+          {streamStatus === 'live' ? '🔴 You\'re Live!' : '🎥 Start a Stream'}
+        </h1>
 
-  // Not streaming yet - show setup form
-  if (!streamId) {
-    return (
-      <div className="stream-host-page">
-        <div className="stream-setup card">
-          <h1>Create Livestream</h1>
-          
-          <form onSubmit={handleCreateStream}>
-            <div className="form-group">
-              <label>Stream Title *</label>
+        {(error || livekitError) && (
+          <div className="bg-red-500/20 border border-red-500 text-red-300 p-4 rounded-xl mb-6">
+            {error || livekitError}
+          </div>
+        )}
+
+        {/* Step 1: Create Stream Form */}
+        {streamStatus === 'idle' && (
+          <form onSubmit={handleCreateStream} className="space-y-4">
+            <div>
+              <label className="block text-sm text-gray-400 mb-2">Stream Title</label>
               <input
                 type="text"
-                className="input"
                 value={streamTitle}
                 onChange={(e) => setStreamTitle(e.target.value)}
-                placeholder="e.g., Charizard Collection Auction"
-                required
+                placeholder="e.g., Opening Vintage Pokémon Packs!"
+                className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 outline-none"
               />
             </div>
-
-            <div className="form-group">
-              <label>Description</label>
+            <div>
+              <label className="block text-sm text-gray-400 mb-2">Description (optional)</label>
               <textarea
-                className="input"
                 value={streamDescription}
                 onChange={(e) => setStreamDescription(e.target.value)}
-                placeholder="Tell viewers what you'll be auctioning..."
-                rows={4}
+                placeholder="What cards will you be auctioning?"
+                rows={3}
+                className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 outline-none resize-none"
               />
             </div>
-
-            {error && <div className="error">{error}</div>}
-
-            <button 
-              type="submit" 
-              className="btn btn-primary"
+            <button
+              type="submit"
               disabled={loading}
+              className="bg-violet-600 hover:bg-violet-700 text-white font-bold px-6 py-3 rounded-xl transition-colors disabled:opacity-50"
             >
               {loading ? 'Creating...' : 'Create Stream'}
             </button>
           </form>
-        </div>
-      </div>
-    );
-  }
+        )}
 
-  // Stream created but not live yet
-  if (!isLive) {
-    return (
-      <div className="stream-host-page">
-        <div className="stream-preview card">
-          <h1>Ready to Go Live</h1>
-          <p>Stream: <strong>{streamTitle}</strong></p>
-          
-          {error && <div className="error">{error}</div>}
-
-          <button 
-            onClick={handleGoLive}
-            className="btn btn-primary"
-            disabled={loading}
-          >
-            {loading ? 'Starting...' : '🔴 Go Live'}
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // Currently live
-  return (
-    <div className="stream-host-page">
-      <div className="stream-live-container">
-        <div className="video-section">
-          <h2>🔴 LIVE: {streamTitle}</h2>
-          
-          {/* Local video preview */}
-          <div className="video-preview">
-            <div ref={videoRef} className="video-player" />
-          </div>
-
-          {/* Controls */}
-          <div className="stream-controls">
-            <button onClick={handleToggleMic} className="btn btn-secondary">
-              🎤 Toggle Mic
-            </button>
-            <button onClick={handleToggleCamera} className="btn btn-secondary">
-              📹 Toggle Camera
-            </button>
-            <button onClick={handleEndStream} className="btn btn-danger">
-              ⏹️ End Stream
+        {/* Step 2: Go Live Button */}
+        {streamStatus === 'created' && (
+          <div className="space-y-4">
+            <p className="text-gray-400">
+              Stream "<span className="text-white">{streamTitle}</span>" is ready.
+              Click below to go live!
+            </p>
+            <button
+              onClick={handleGoLive}
+              disabled={loading}
+              className="bg-red-600 hover:bg-red-700 text-white font-bold px-8 py-4 rounded-xl text-lg transition-colors disabled:opacity-50"
+            >
+              {loading ? 'Connecting...' : '🔴 Go Live'}
             </button>
           </div>
+        )}
 
-          {error && <div className="error">{error}</div>}
-        </div>
+        {/* Step 3: Live Stream View */}
+        {streamStatus === 'live' && (
+          <div className="space-y-4">
+            <div className="relative w-full aspect-video bg-black rounded-2xl overflow-hidden">
+              <video
+                ref={videoRef}
+                autoPlay
+                muted
+                playsInline
+                className="w-full h-full object-cover"
+              />
+              {!localVideoTrack && (
+                <div className="absolute inset-0 flex items-center justify-center text-gray-500">
+                  {isPublishing ? 'Audio-only (no camera detected)' : 'Connecting...'}
+                </div>
+              )}
+              <div className="absolute top-4 left-4 flex items-center gap-2 bg-red-600 px-3 py-1.5 rounded-lg">
+                <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+                <span className="text-sm font-bold">LIVE</span>
+              </div>
+            </div>
 
-        <div className="stream-info">
-          <h3>Stream Info</h3>
-          <p>Status: <span className="live-badge">LIVE</span></p>
-          <p>Connected: {isJoined ? 'Yes' : 'No'}</p>
-          <p>Share this link with viewers:</p>
-          <code>
-            {`${window.location.origin}/livestream/${streamId}`}
-          </code>
-        </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleToggleMic}
+                className={`px-4 py-2 rounded-xl font-medium transition-colors ${
+                  isMicMuted
+                    ? 'bg-red-600 hover:bg-red-700'
+                    : 'bg-gray-800 hover:bg-gray-700'
+                }`}
+              >
+                {isMicMuted ? '🔇 Unmute' : '🎤 Mute'}
+              </button>
+
+              <button
+                onClick={handleToggleCamera}
+                className={`px-4 py-2 rounded-xl font-medium transition-colors ${
+                  isCameraMuted
+                    ? 'bg-red-600 hover:bg-red-700'
+                    : 'bg-gray-800 hover:bg-gray-700'
+                }`}
+              >
+                {isCameraMuted ? '📷 Turn On' : '📷 Turn Off'}
+              </button>
+
+              <button
+                onClick={handleEndStream}
+                className="bg-gray-800 hover:bg-red-600 px-4 py-2 rounded-xl font-medium transition-colors ml-auto"
+              >
+                End Stream
+              </button>
+            </div>
+
+            <div className="text-sm text-gray-500 space-y-1">
+              <p>Connected: {isJoined ? '✅ Yes' : '❌ No'}</p>
+              <p>Publishing: {isPublishing ? '✅ Yes' : '❌ No'}</p>
+              <p>
+                Share link:{' '}
+                <code className="text-violet-400">
+                  {`${window.location.origin}/livestream/${streamId}`}
+                </code>
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

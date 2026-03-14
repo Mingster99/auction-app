@@ -1,160 +1,187 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { useParams } from 'react-router-dom';
-import { useAgora } from '../hooks/useAgora';
+import React, { useState, useEffect, useRef } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { useLiveKit } from '../hooks/useLiveKit';
 import { streamService } from '../services/streamService';
 
 function StreamViewer() {
-  // Route is defined as /livestream/:id in App.jsx
   const { id } = useParams();
   const streamId = id;
-  const [stream, setStream] = useState(null);
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [joined, setJoined] = useState(false);
-  
-  const remoteVideoRef = useRef(null);
-  
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const videoRef = useRef(null);
+
   const {
+    isJoined,
+    remoteVideoTrack,
+    error: livekitError,
     joinAsViewer,
     leave,
-    remoteUsers,
-    isJoined
-  } = useAgora();
+  } = useLiveKit();
+
+  const [stream, setStream] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   // Fetch stream info
   useEffect(() => {
     const fetchStream = async () => {
       try {
-        const data = await streamService.getStreamById(streamId);
+        const response = await streamService.getStreamById(streamId);
+        const data = response.data || response;
         setStream(data);
-
-        // Auto-join if stream is live
-        if (data.status === 'live') {
-          await handleJoinStream();
-        }
       } catch (err) {
-        console.error('Failed to fetch stream:', err);
         setError('Stream not found or no longer available');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchStream();
-
-    return () => {
-      leave();
-    };
+    if (streamId) fetchStream();
   }, [streamId]);
 
-  // Play remote video when user is available
+  // Auto-join if stream is live
   useEffect(() => {
-    if (remoteUsers.length > 0 && remoteVideoRef.current) {
-      const remoteUser = remoteUsers[0];
-      if (remoteUser.videoTrack) {
-        remoteUser.videoTrack.play(remoteVideoRef.current);
-      }
+    if (stream?.status === 'live' && user && !isJoined) {
+      handleJoinStream();
     }
-  }, [remoteUsers]);
+  }, [stream, user]);
 
+  // Attach remote video when track arrives
+  useEffect(() => {
+    if (remoteVideoTrack && videoRef.current) {
+      remoteVideoTrack.attach(videoRef.current);
+      return () => {
+        remoteVideoTrack.detach(videoRef.current);
+      };
+    }
+  }, [remoteVideoTrack]);
+
+  // Join stream
   const handleJoinStream = async () => {
+    if (!streamId || !user) return;
     setError('');
-    setLoading(true);
 
     try {
-      // Get Agora credentials from backend
       const response = await streamService.joinStream(streamId);
-      const { channelName, agora } = response;
+      const data = response.data || response;
+      const { token, wsUrl } = data.livekit;
 
-      console.log('Joining stream:', channelName);
-
-      // Join Agora channel as viewer
-      await joinAsViewer(channelName, agora.token, agora.uid);
-
-      setJoined(true);
-      console.log('Joined stream successfully');
+      console.log('🔑 Got LiveKit viewer credentials, connecting...');
+      await joinAsViewer(wsUrl, token);
+      console.log('✅ Joined as viewer!');
     } catch (err) {
-      console.error('Failed to join stream:', err);
       setError(err.response?.data?.message || 'Failed to join stream');
-    } finally {
-      setLoading(false);
+      console.error('❌ Join failed:', err);
     }
   };
 
-  if (loading && !stream) {
-    return <div className="loading">Loading stream...</div>;
+  // Leave stream
+  const handleLeave = async () => {
+    await leave();
+    navigate('/');
+  };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      leave();
+    };
+  }, [leave]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#0f1419] flex items-center justify-center">
+        <p className="text-gray-400 text-lg">Loading stream...</p>
+      </div>
+    );
   }
 
   if (error && !stream) {
-    return <div className="error-page card"><h2>Error</h2><p>{error}</p></div>;
-  }
-
-  if (!stream) {
-    return <div className="error-page card"><p>Stream not found</p></div>;
-  }
-
-  // Stream is not live yet
-  if (stream.status !== 'live') {
     return (
-      <div className="stream-viewer-page">
-        <div className="stream-offline card">
-          <h2>{stream.title}</h2>
-          <p>This stream is currently offline.</p>
-          <p>Host: {stream.host_name}</p>
-          <p>Status: {stream.status}</p>
+      <div className="min-h-screen bg-[#0f1419] flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-400 text-lg mb-4">{error}</p>
+          <button
+            onClick={() => navigate('/')}
+            className="bg-violet-600 hover:bg-violet-700 text-white px-6 py-2 rounded-xl"
+          >
+            Back to Home
+          </button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="stream-viewer-page">
-      <div className="stream-container">
-        <div className="video-section">
-          <h2>🔴 LIVE: {stream.title}</h2>
-          
-          {/* Remote video player */}
-          <div className="video-player-container">
-            {remoteUsers.length > 0 ? (
-              <div ref={remoteVideoRef} className="video-player" />
-            ) : (
-              <div className="video-placeholder">
-                <p>Waiting for host to start broadcasting...</p>
-                {isJoined && <p>✅ Connected to stream</p>}
-              </div>
+    <div className="min-h-screen bg-[#0f1419] text-white">
+      <div className="max-w-6xl mx-auto p-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Video area */}
+          <div className="lg:col-span-2">
+            <div className="relative w-full aspect-video bg-black rounded-2xl overflow-hidden">
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                className="w-full h-full object-cover"
+              />
+              {!remoteVideoTrack && (
+                <div className="absolute inset-0 flex items-center justify-center text-gray-500">
+                  {isJoined
+                    ? 'Waiting for host to start broadcasting...'
+                    : 'Connecting to stream...'}
+                </div>
+              )}
+
+              {stream?.status === 'live' && (
+                <div className="absolute top-4 left-4 flex items-center gap-2 bg-red-600 px-3 py-1.5 rounded-lg">
+                  <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+                  <span className="text-sm font-bold">LIVE</span>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-4">
+              <h1 className="text-2xl font-bold">{stream?.title}</h1>
+              <p className="text-gray-400 mt-1">
+                Hosted by <span className="text-violet-400">{stream?.host_name}</span>
+              </p>
+              {stream?.description && (
+                <p className="text-gray-500 mt-2">{stream.description}</p>
+              )}
+            </div>
+
+            <div className="mt-4">
+              {!isJoined && stream?.status === 'live' && (
+                <button
+                  onClick={handleJoinStream}
+                  className="bg-violet-600 hover:bg-violet-700 text-white font-bold px-6 py-3 rounded-xl"
+                >
+                  Join Stream
+                </button>
+              )}
+              {isJoined && (
+                <button
+                  onClick={handleLeave}
+                  className="bg-gray-800 hover:bg-gray-700 text-white px-6 py-3 rounded-xl"
+                >
+                  Leave Stream
+                </button>
+              )}
+            </div>
+
+            {(error || livekitError) && (
+              <p className="text-red-400 mt-3">{error || livekitError}</p>
             )}
           </div>
 
-          {/* Stream info */}
-          <div className="stream-details">
-            <p><strong>Host:</strong> {stream.host_name}</p>
-            <p><strong>Viewers:</strong> {stream.viewer_count || 0}</p>
-            {stream.description && <p>{stream.description}</p>}
-          </div>
-
-          {error && <div className="error">{error}</div>}
-
-          {!joined && (
-            <button 
-              onClick={handleJoinStream} 
-              className="btn btn-primary"
-              disabled={loading}
-            >
-              {loading ? 'Joining...' : 'Join Stream'}
-            </button>
-          )}
-        </div>
-
-        {/* Sidebar for chat/bidding (you can add this later) */}
-        <div className="stream-sidebar">
-          <div className="card">
-            <h3>Chat</h3>
-            <p>Chat coming soon...</p>
-          </div>
-          
-          <div className="card">
-            <h3>Current Auction</h3>
-            <p>Bidding panel coming soon...</p>
+          {/* Sidebar */}
+          <div className="lg:col-span-1">
+            <div className="bg-[#1a1f2e] rounded-2xl border border-gray-800 p-4 h-96">
+              <h3 className="font-bold text-sm text-gray-400 mb-3">LIVE CHAT</h3>
+              <p className="text-gray-600 text-sm">Chat coming soon...</p>
+            </div>
           </div>
         </div>
       </div>
