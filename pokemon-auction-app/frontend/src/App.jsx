@@ -15,6 +15,8 @@ import LivestreamPage from './pages/LivestreamPage';
 import CardDetailPage from './pages/CardDetailPage';
 import ListCardPage from './pages/ListCardPage';
 import StreamHostPage from './pages/StreamHostPage';
+import PSAImportPage from './pages/PSAImportPage';
+import MyCardsPage from './pages/MyCardsPage';
 
 // ============================================================
 // APP.JSX - The Root Component
@@ -63,13 +65,16 @@ function App() {
               {/* /cards/new MUST come before /cards/:id */}
               {/* Otherwise React Router might think "new" is an ID */}
               <Route path="/cards/new" element={<ListCardPage />} />
+              <Route path="/psa-import" element={<PSAImportPage />} />  
               <Route path="/card/:cardId" element={<CardDetailPage />} />
 
               {/* Stream routes */}
               {/* :id means any value - accessible as params.id in component */}
               <Route path="/livestream/:id" element={<LivestreamPage />} />
-
               <Route path="/stream/host" element={<StreamHostPage />} />
+
+              {/* Inventory routes */}
+              <Route path="/my-cards" element={<MyCardsPage />} />
 
               {/* 404 - catches any unmatched routes */}
               <Route path="*" element={

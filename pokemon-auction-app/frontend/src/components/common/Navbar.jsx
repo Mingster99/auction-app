@@ -76,7 +76,13 @@ function Navbar() {
                 >
                   + List Card
                 </Link>
-
+                {/* PSA scan button */}
+                <Link
+                  to="/psa-import"
+                  className="text-sm font-medium text-gray-300 hover:text-white transition-colors"
+                >
+                  Scan PSA
+                </Link>
                 {/* Go live button */}
                 <Link
                   to="/stream/host"
@@ -188,6 +194,13 @@ function Navbar() {
                   className="block px-4 py-3 text-gray-300 hover:text-white hover:bg-gray-800 rounded-xl transition-colors"
                 >
                   + List a Card
+                </Link>
+                <Link
+                  to="/psa-import"
+                  onClick={() => setMobileOpen(false)}
+                  className="block px-4 py-3 text-gray-300 hover:text-white hover:bg-gray-800 rounded-xl transition-colors"
+                >
+                  Scan PSA
                 </Link>
                 <Link
                   to="/profile"
