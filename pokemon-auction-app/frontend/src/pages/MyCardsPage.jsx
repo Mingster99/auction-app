@@ -3,6 +3,21 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 
+const GAME_LABELS = {
+  pokemon: 'Pokémon',
+  onepiece: 'One Piece',
+  yugioh: 'Yu-Gi-Oh!',
+  mtg: 'Magic: The Gathering',
+  dbs: 'Dragon Ball Super',
+  digimon: 'Digimon',
+  cardfight: 'Cardfight!! Vanguard',
+  weiss: 'Weiss Schwarz',
+  lorcana: 'Disney Lorcana',
+  flesh: 'Flesh and Blood',
+  union: 'Union Arena',
+  other: 'Other TCG',
+};
+
 function MyCardsPage() {
   const { user } = useAuth();
   const [cards, setCards] = useState([]);
@@ -305,14 +320,19 @@ function CardItem({
         )}
 
         {/* Badges */}
-        <div className="absolute top-2 left-2 flex gap-1.5">
+        <div className="absolute top-2 left-2 flex flex-col gap-1">
+          {card.tcg_game && (
+            <span className="w-fit bg-gray-900/80 backdrop-blur-sm text-white text-xs font-bold px-2 py-0.5 rounded-md">
+              {GAME_LABELS[card.tcg_game] || card.tcg_game}
+            </span>
+          )}
           {card.is_psa_verified && (
-            <span className="bg-blue-600 text-white text-xs font-bold px-2 py-0.5 rounded-md">
+            <span className="w-fit bg-blue-600 text-white text-xs font-bold px-2 py-0.5 rounded-md">
               PSA {card.psa_grade}
             </span>
           )}
           {card.queued_for_stream && (
-            <span className="bg-red-600 text-white text-xs font-bold px-2 py-0.5 rounded-md flex items-center gap-1">
+            <span className="w-fit bg-red-600 text-white text-xs font-bold px-2 py-0.5 rounded-md flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
               QUEUED
             </span>
@@ -492,6 +512,12 @@ function CardDetailModal({ card, onClose }) {
         {/* Card Details */}
         <div className="px-5 pb-5">
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4 bg-gray-900/50 rounded-xl">
+            {card.tcg_game && (
+              <div>
+                <p className="text-xs text-gray-500">Card Game</p>
+                <p className="text-sm text-white font-bold">{GAME_LABELS[card.tcg_game] || card.tcg_game}</p>
+              </div>
+            )}
             {card.psa_grade && (
               <div>
                 <p className="text-xs text-gray-500">Grade</p>

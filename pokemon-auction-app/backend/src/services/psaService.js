@@ -7,13 +7,7 @@ const axios = require('axios');
 //   1. GET /cert/GetByCertNumber/{certNumber}       → card data
 //   2. GET /cert/GetImagesByCertNumber/{certNumber}  → slab images
 //
-// Image response shape (confirmed):
-//   [{ IsFrontImage: boolean, ImageURL: string }, ...]
-//
-// Cert response shape (confirmed):
-//   { PSACert: { CertNumber, CardGrade, Year, Brand, Category,
-//     CardNumber, Subject, Variety, LabelType, GradeDescription,
-//     TotalPopulation, PopulationHigher, IsPSADNA, IsDualCert } }
+// Also includes TCG game auto-detection from the Brand field.
 // ============================================================
 
 const PSA_API_BASE = 'https://api.psacard.com/publicapi';
@@ -24,7 +18,60 @@ const headers = {
   'Accept': 'application/json',
 };
 
+// ── TCG GAME DETECTION ───────────────────────────────────
+// Maps keywords found in PSA's Brand field to game identifiers.
+// Checked top-to-bottom — first match wins.
+// Add new games here as you expand.
+const GAME_KEYWORDS = [
+  { game: 'pokemon',    keywords: ['pokemon', 'pokémon', 'nintendo', 'pikachu', 'charizard'] },
+  { game: 'onepiece',   keywords: ['one piece', 'onepiece'] },
+  { game: 'yugioh',     keywords: ['yu-gi-oh', 'yugioh', 'yu gi oh', 'konami'] },
+  { game: 'mtg',        keywords: ['magic', 'mtg', 'wizards of the coast', 'gathering'] },
+  { game: 'dbs',        keywords: ['dragon ball', 'dragonball', 'bandai dragon'] },
+  { game: 'digimon',    keywords: ['digimon'] },
+  { game: 'cardfight',  keywords: ['cardfight', 'vanguard'] },
+  { game: 'weiss',      keywords: ['weiss schwarz', 'weiss'] },
+  { game: 'lorcana',    keywords: ['lorcana', 'disney lorcana'] },
+  { game: 'flesh',      keywords: ['flesh and blood', 'flesh & blood'] },
+  { game: 'union',      keywords: ['union arena'] },
+];
+
+// Display names for the frontend
+const GAME_LABELS = {
+  pokemon:   'Pokémon',
+  onepiece:  'One Piece',
+  yugioh:    'Yu-Gi-Oh!',
+  mtg:       'Magic: The Gathering',
+  dbs:       'Dragon Ball Super',
+  digimon:   'Digimon',
+  cardfight: 'Cardfight!! Vanguard',
+  weiss:     'Weiss Schwarz',
+  lorcana:   'Disney Lorcana',
+  flesh:     'Flesh and Blood',
+  union:     'Union Arena',
+  other:     'Other TCG',
+};
+
+function detectGame(brand, category) {
+  if (!brand) return null;
+  const lower = brand.toLowerCase();
+
+  for (const entry of GAME_KEYWORDS) {
+    for (const keyword of entry.keywords) {
+      if (lower.includes(keyword)) {
+        return entry.game;
+      }
+    }
+  }
+
+  return null; // No match — user will select manually
+}
+
+
 const psaService = {
+
+  // Expose game labels so routes can send them to frontend
+  GAME_LABELS,
 
   lookupCert: async (certNumber) => {
     const cleaned = String(certNumber).replace(/\D/g, '');
@@ -90,7 +137,6 @@ const psaService = {
   adaptResponse: (raw, imageData) => {
     const cert = raw.PSACert || raw;
 
-    // Build description
     const descriptionParts = [
       cert.Year,
       cert.Brand,
@@ -109,6 +155,9 @@ const psaService = {
       frontImage = front?.ImageURL || null;
       backImage = back?.ImageURL || null;
     }
+
+    // Auto-detect TCG game from Brand field
+    const detectedGame = detectGame(cert.Brand, cert.Category);
 
     return {
       certNumber: String(cert.CertNumber || ''),
@@ -131,6 +180,10 @@ const psaService = {
       backImage,
       hasImages: Boolean(frontImage || backImage),
       imageSource: frontImage ? 'psa_api' : null,
+      // TCG game detection
+      detectedGame,
+      detectedGameLabel: detectedGame ? GAME_LABELS[detectedGame] : null,
+      gameLabels: GAME_LABELS,
     };
   },
 };

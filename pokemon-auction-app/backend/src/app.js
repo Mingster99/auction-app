@@ -10,6 +10,7 @@ const streamRoutes = require('./modules/streams/streams.routes');
 const bidRoutes = require('./modules/bids/bids.routes');
 const errorMiddleware = require('./middleware/error.middleware');
 const inventoryRoutes = require('./modules/inventory/inventory.routes');
+const browseRoutes = require('./modules/browse/browse.routes');
 
 const app = express();
 
@@ -36,6 +37,7 @@ app.use('/api/cards', cardRoutes);
 app.use('/api/streams', streamRoutes);
 app.use('/api/bids', bidRoutes);
 app.use('/api/inventory', inventoryRoutes);
+app.use('/api/browse', browseRoutes); 
 
 // Error handling middleware (must be last)
 app.use(errorMiddleware);

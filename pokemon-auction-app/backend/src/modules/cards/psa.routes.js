@@ -43,7 +43,6 @@ router.post('/psa-lookup', authMiddleware, async (req, res, next) => {
       return res.status(400).json({ message: 'Cert number is required' });
     }
 
-    // Check duplicate
     const existing = await pool.query(
       'SELECT id, name, psa_grade FROM cards WHERE psa_cert_number = $1 AND seller_id = $2',
       [String(certNumber), req.user.id]
@@ -84,12 +83,11 @@ router.post('/psa-lookup', authMiddleware, async (req, res, next) => {
 // ── PSA IMPORT (save to inventory) ───────────────────────
 router.post('/psa-import', authMiddleware, async (req, res, next) => {
   try {
-    const { certNumber, startingBid, overrides } = req.body;
+    const { certNumber, startingBid, tcgGame, overrides } = req.body;
     if (!certNumber) {
       return res.status(400).json({ message: 'Cert number is required' });
     }
 
-    // Check duplicate
     const existing = await pool.query(
       'SELECT * FROM cards WHERE psa_cert_number = $1 AND seller_id = $2',
       [String(certNumber), req.user.id]
@@ -107,11 +105,9 @@ router.post('/psa-import', authMiddleware, async (req, res, next) => {
       return res.status(404).json({ message: 'No card found for this cert number' });
     }
 
-    // Build card name
     const cardName = overrides?.name
       || `${psaData.subject || 'Unknown Card'} ${psaData.cardNumber ? '#' + psaData.cardNumber : ''}`.trim();
 
-    // Map grade to condition
     let condition = 'Graded';
     if (psaData.grade.includes('10')) condition = 'Gem Mint';
     else if (parseFloat(psaData.grade) >= 9) condition = 'Mint';
@@ -119,6 +115,9 @@ router.post('/psa-import', authMiddleware, async (req, res, next) => {
     else if (parseFloat(psaData.grade) >= 5) condition = 'Excellent';
     else if (parseFloat(psaData.grade) >= 3) condition = 'Good';
     else if (parseFloat(psaData.grade) >= 1) condition = 'Poor';
+
+    // Use user-selected game, fall back to auto-detected
+    const gameValue = tcgGame || psaData.detectedGame || 'other';
 
     const result = await pool.query(
       `INSERT INTO cards (
@@ -128,7 +127,8 @@ router.post('/psa-import', authMiddleware, async (req, res, next) => {
         psa_year, psa_brand, psa_category,
         psa_subject, psa_card_number, psa_variety, psa_label_type,
         is_psa_verified, psa_population, psa_population_higher,
-        card_image_front, card_image_back, image_source
+        card_image_front, card_image_back, image_source,
+        tcg_game
       ) VALUES (
         $1, $2, $3, $4, $5, $6, $7,
         $8, $9, $10,
@@ -136,35 +136,37 @@ router.post('/psa-import', authMiddleware, async (req, res, next) => {
         $14, $15, $16,
         $17, $18, $19, $20,
         $21, $22, $23,
-        $24, $25, $26
+        $24, $25, $26,
+        $27
       ) RETURNING *`,
       [
-        req.user.id,                                      // $1  seller_id
-        cardName,                                         // $2  name
-        overrides?.set || psaData.variety || null,         // $3  set
-        overrides?.rarity || null,                         // $4  rarity
-        condition,                                        // $5  condition
-        psaData.gradeDescription || psaData.grade,        // $6  grading
-        psaData.description,                              // $7  description
-        psaData.frontImage || null,                       // $8  image_url (thumbnail)
-        startingBid || 0,                                 // $9  starting_bid
-        'pending',                                        // $10 status
-        psaData.certNumber,                               // $11 psa_cert_number
-        psaData.grade,                                    // $12 psa_grade
-        psaData.gradeDescription,                         // $13 psa_grade_description
-        psaData.year,                                     // $14 psa_year
-        psaData.brand,                                    // $15 psa_brand
-        psaData.category,                                 // $16 psa_category
-        psaData.subject,                                  // $17 psa_subject
-        psaData.cardNumber,                               // $18 psa_card_number
-        psaData.variety,                                  // $19 psa_variety
-        psaData.labelType,                                // $20 psa_label_type
-        true,                                             // $21 is_psa_verified
-        psaData.totalPopulation,                          // $22 psa_population
-        psaData.populationHigher,                         // $23 psa_population_higher
-        psaData.frontImage || null,                       // $24 card_image_front
-        psaData.backImage || null,                        // $25 card_image_back
-        psaData.imageSource || null,                      // $26 image_source
+        req.user.id,
+        cardName,
+        overrides?.set || psaData.variety || null,
+        overrides?.rarity || null,
+        condition,
+        psaData.gradeDescription || psaData.grade,
+        psaData.description,
+        psaData.frontImage || null,
+        startingBid || 0,
+        'pending',
+        psaData.certNumber,
+        psaData.grade,
+        psaData.gradeDescription,
+        psaData.year,
+        psaData.brand,
+        psaData.category,
+        psaData.subject,
+        psaData.cardNumber,
+        psaData.variety,
+        psaData.labelType,
+        true,
+        psaData.totalPopulation,
+        psaData.populationHigher,
+        psaData.frontImage || null,
+        psaData.backImage || null,
+        psaData.imageSource || null,
+        gameValue,
       ]
     );
 

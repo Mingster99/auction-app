@@ -17,6 +17,8 @@ import ListCardPage from './pages/ListCardPage';
 import StreamHostPage from './pages/StreamHostPage';
 import PSAImportPage from './pages/PSAImportPage';
 import MyCardsPage from './pages/MyCardsPage';
+import BrowseCardsPage from './pages/BrowseCardsPage';
+import SellerProfilePage from './pages/SellerProfilePage';
 
 // ============================================================
 // APP.JSX - The Root Component
@@ -68,6 +70,9 @@ function App() {
               <Route path="/psa-import" element={<PSAImportPage />} />  
               <Route path="/card/:cardId" element={<CardDetailPage />} />
 
+              {/* Seller Profile routes */}
+              <Route path="/seller/:username" element={<SellerProfilePage />} />
+
               {/* Stream routes */}
               {/* :id means any value - accessible as params.id in component */}
               <Route path="/livestream/:id" element={<LivestreamPage />} />
@@ -75,6 +80,10 @@ function App() {
 
               {/* Inventory routes */}
               <Route path="/my-cards" element={<MyCardsPage />} />
+
+              {/* Browse routes */}
+              <Route path="/cards" element={<BrowseCardsPage />} />
+
 
               {/* 404 - catches any unmatched routes */}
               <Route path="*" element={
