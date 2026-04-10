@@ -113,7 +113,7 @@ function LoginPage() {
         <div className="text-center mb-10">
           <Link to="/" className="inline-block">
             <span className="text-3xl font-black bg-gradient-to-r from-violet-400 to-blue-400 bg-clip-text text-transparent">
-              PokéAuctions
+              Vaultive Auctions
             </span>
           </Link>
           <h1 className="text-2xl font-bold text-white mt-4">Welcome back</h1>
