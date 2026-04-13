@@ -43,7 +43,7 @@ function StreamHost() {
         if (myStream) {
           setStreamId(myStream.id);
           setStreamTitle(myStream.title);
-          setStreamStatus('live');
+          setStreamStatus('existing');
         }
       } catch (err) {
         console.log('No existing stream found');
@@ -51,6 +51,13 @@ function StreamHost() {
     };
     if (user) checkExistingStream();
   }, [user]);
+
+  // Drop back to 'existing' (Rejoin) if LiveKit disconnects unexpectedly mid-stream
+  useEffect(() => {
+    if (streamStatus === 'live' && !isJoined && !loading) {
+      setStreamStatus('existing');
+    }
+  }, [isJoined, streamStatus, loading]);
 
   // Play local video when track is available
   useEffect(() => {
@@ -175,6 +182,31 @@ function StreamHost() {
               {loading ? 'Creating...' : 'Create Stream'}
             </button>
           </form>
+        )}
+
+        {/* Existing Stream: Rejoin or End */}
+        {streamStatus === 'existing' && (
+          <div className="space-y-4">
+            <p className="text-gray-400">
+              You have an active stream:{' '}
+              <span className="text-white font-semibold">"{streamTitle}"</span>
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={handleGoLive}
+                disabled={loading}
+                className="bg-violet-600 hover:bg-violet-700 text-white font-bold px-8 py-4 rounded-xl text-lg transition-colors disabled:opacity-50"
+              >
+                {loading ? 'Reconnecting...' : '↩ Rejoin Stream'}
+              </button>
+              <button
+                onClick={handleEndStream}
+                className="bg-gray-800 hover:bg-red-600 text-white font-medium px-6 py-4 rounded-xl transition-colors"
+              >
+                End Stream
+              </button>
+            </div>
+          </div>
         )}
 
         {/* Step 2: Go Live Button */}

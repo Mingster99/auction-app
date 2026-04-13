@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { streamService } from '../../services/streamService';
 
 // ============================================================
 // NAVBAR COMPONENT
@@ -15,9 +16,30 @@ import { useAuth } from '../../context/AuthContext';
 
 function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [hasActiveStream, setHasActiveStream] = useState(false);
   const { user, isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation(); // Gets current URL path
+
+  // Check if the logged-in user is hosting an active stream
+  useEffect(() => {
+    if (!isAuthenticated || !user) {
+      setHasActiveStream(false);
+      return;
+    }
+    const check = async () => {
+      try {
+        const streams = await streamService.getActiveStreams();
+        const list = streams.data || streams;
+        setHasActiveStream(
+          list.some((s) => s.host_name === user.username && s.status === 'live')
+        );
+      } catch {
+        setHasActiveStream(false);
+      }
+    };
+    check();
+  }, [isAuthenticated, user, location.pathname]);
 
   const handleLogout = async () => {
     try {
@@ -83,13 +105,17 @@ function Navbar() {
                 >
                   Scan PSA
                 </Link>
-                {/* Go live button */}
+                {/* Go live / Rejoin stream button */}
                 <Link
                   to="/stream/host"
-                  className="flex items-center gap-1.5 bg-red-600/20 hover:bg-red-600/30 border border-red-500/30 text-red-400 px-3 py-1.5 rounded-full text-sm font-medium transition-all"
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all border ${
+                    hasActiveStream
+                      ? 'bg-violet-600/20 hover:bg-violet-600/30 border-violet-500/30 text-violet-400'
+                      : 'bg-red-600/20 hover:bg-red-600/30 border-red-500/30 text-red-400'
+                  }`}
                 >
-                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                  Go Live
+                  <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${hasActiveStream ? 'bg-violet-400' : 'bg-red-500'}`} />
+                  {hasActiveStream ? 'Rejoin Stream' : 'Go Live'}
                 </Link>
 
                 {/* User dropdown */}
@@ -201,6 +227,17 @@ function Navbar() {
                   className="block px-4 py-3 text-gray-300 hover:text-white hover:bg-gray-800 rounded-xl transition-colors"
                 >
                   Scan PSA
+                </Link>
+                <Link
+                  to="/stream/host"
+                  onClick={() => setMobileOpen(false)}
+                  className={`block px-4 py-3 rounded-xl transition-colors font-medium ${
+                    hasActiveStream
+                      ? 'text-violet-400 hover:bg-gray-800'
+                      : 'text-red-400 hover:bg-gray-800'
+                  }`}
+                >
+                  {hasActiveStream ? '↩ Rejoin Stream' : '🔴 Go Live'}
                 </Link>
                 <Link
                   to="/profile"
