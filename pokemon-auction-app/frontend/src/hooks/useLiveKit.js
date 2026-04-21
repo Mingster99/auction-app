@@ -30,6 +30,7 @@ export const useLiveKit = () => {
   const [remoteAudioTrack, setRemoteAudioTrack] = useState(null);
   const [localVideoTrack, setLocalVideoTrack] = useState(null);
   const [localAudioTrack, setLocalAudioTrack] = useState(null);
+  const [isHostPresent, setIsHostPresent] = useState(true);
   const [error, setError] = useState(null);
 
   // ── SETUP ROOM EVENT LISTENERS ──────────────────────────
@@ -43,7 +44,23 @@ export const useLiveKit = () => {
       if (track.kind === Track.Kind.Audio) {
         setRemoteAudioTrack(track);
         const audioEl = track.attach();
+        audioEl.muted = true;
         document.body.appendChild(audioEl);
+
+        // Attempt autoplay — browsers block this without prior user interaction
+        const tryPlay = () => {
+          audioEl.muted = false;
+          audioEl.play().catch(() => {
+            // Autoplay blocked — unmute on first user click
+            const resumeAudio = () => {
+              audioEl.muted = false;
+              audioEl.play().catch(() => {});
+              document.removeEventListener('click', resumeAudio);
+            };
+            document.addEventListener('click', resumeAudio, { once: true });
+          });
+        };
+        tryPlay();
       }
     });
 
@@ -65,6 +82,20 @@ export const useLiveKit = () => {
       setIsPublishing(false);
       setRemoteVideoTrack(null);
       setRemoteAudioTrack(null);
+    });
+
+    room.on(RoomEvent.ParticipantConnected, (participant) => {
+      console.log('👤 Participant connected:', participant.identity);
+      if (participant.identity.startsWith('host_')) {
+        setIsHostPresent(true);
+      }
+    });
+
+    room.on(RoomEvent.ParticipantDisconnected, (participant) => {
+      console.log('👤 Participant disconnected:', participant.identity);
+      if (participant.identity.startsWith('host_')) {
+        setIsHostPresent(false);
+      }
     });
 
     room.on(RoomEvent.Reconnecting, () => {
@@ -158,6 +189,11 @@ export const useLiveKit = () => {
       await room.connect(wsUrl, token);
       console.log('✅ Connected as viewer to room:', room.name);
       setIsJoined(true);
+
+      // Seed host presence from participants already in the room
+      const hostAlreadyPresent = [...room.remoteParticipants.values()]
+        .some((p) => p.identity.startsWith('host_'));
+      setIsHostPresent(hostAlreadyPresent);
     } catch (err) {
       console.error('❌ Failed to join as viewer:', err);
       setError(err.message);
@@ -170,11 +206,9 @@ export const useLiveKit = () => {
     try {
       const room = roomRef.current;
       if (room) {
-        if (localVideoTrack) {
-          localVideoTrack.stop();
-        }
-        if (localAudioTrack) {
-          localAudioTrack.stop();
+        // Stop local tracks via the room's local participant (avoids stale closure)
+        for (const pub of room.localParticipant.trackPublications.values()) {
+          pub.track?.stop();
         }
 
         await room.disconnect(true);
@@ -189,12 +223,13 @@ export const useLiveKit = () => {
       setRemoteAudioTrack(null);
       setIsMicMuted(false);
       setIsCameraMuted(false);
+      setIsHostPresent(true);
 
       console.log('👋 Left room');
     } catch (err) {
       console.error('Error leaving room:', err);
     }
-  }, [localVideoTrack, localAudioTrack]);
+  }, []);
 
   // ── TOGGLE MIC ──────────────────────────────────────────
   const toggleMic = useCallback(async () => {
@@ -233,6 +268,7 @@ export const useLiveKit = () => {
     remoteAudioTrack,
     localVideoTrack,
     localAudioTrack,
+    isHostPresent,
     error,
     joinAsHost,
     joinAsViewer,

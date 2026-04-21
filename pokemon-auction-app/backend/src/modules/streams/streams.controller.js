@@ -1,5 +1,6 @@
 const pool = require('../../config/database');
 const livekitService = require('../../services/livekitService');
+const { getIO } = require('../../websocket/socketHandler');
 
 // ============================================================
 // STREAMS CONTROLLER — LiveKit Version
@@ -230,6 +231,221 @@ const streamsController = {
         message: 'Stream ended successfully',
         stream: result.rows[0],
       });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  // ── SCHEDULE STREAM ──────────────────────────────────────
+  // POST /api/streams/schedule
+  scheduleStream: async (req, res, next) => {
+    try {
+      const { title, description, scheduled_start_time } = req.body;
+      const hostId = req.user.id;
+
+      if (!title) {
+        return res.status(400).json({ message: 'Stream title is required' });
+      }
+      if (!scheduled_start_time) {
+        return res.status(400).json({ message: 'Scheduled start time is required' });
+      }
+
+      const startTime = new Date(scheduled_start_time);
+      if (startTime <= new Date()) {
+        return res.status(400).json({ message: 'Scheduled time must be in the future' });
+      }
+
+      // Verify seller
+      const { rows: userRows } = await pool.query(
+        'SELECT is_verified_seller FROM users WHERE id = $1',
+        [hostId]
+      );
+      if (!userRows[0]?.is_verified_seller) {
+        return res.status(403).json({ message: 'Only verified sellers can schedule streams' });
+      }
+
+      const channelName = `stream_${hostId}_${Date.now()}`;
+
+      const { rows } = await pool.query(
+        `INSERT INTO streams (host_id, title, description, channel_name, status, scheduled_start_time)
+         VALUES ($1, $2, $3, $4, 'scheduled', $5)
+         RETURNING *`,
+        [hostId, title, description || '', channelName, startTime]
+      );
+
+      res.status(201).json(rows[0]);
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  // ── GET UPCOMING STREAMS ───────────────────────────────
+  // GET /api/streams/upcoming
+  getUpcomingStreams: async (req, res, next) => {
+    try {
+      const { rows: streams } = await pool.query(
+        `SELECT s.*, u.username AS host_name, u.avatar_url AS host_avatar,
+                (SELECT COUNT(*) FROM stream_notifications sn WHERE sn.stream_id = s.id) AS subscriber_count
+         FROM streams s
+         JOIN users u ON s.host_id = u.id
+         WHERE s.status = 'scheduled' AND s.scheduled_start_time > NOW()
+         ORDER BY s.scheduled_start_time ASC`
+      );
+
+      // Fetch preview cards for each stream (first 4 queued cards)
+      for (const stream of streams) {
+        const { rows: cards } = await pool.query(
+          `SELECT id, name, card_image_front, image_url, psa_grade, starting_bid
+           FROM cards
+           WHERE stream_id = $1 AND queued_for_stream = true
+           ORDER BY queue_order ASC NULLS LAST, queued_at ASC
+           LIMIT 4`,
+          [stream.id]
+        );
+        stream.preview_cards = cards;
+      }
+
+      res.json(streams);
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  // ── GET MY STREAMS ─────────────────────────────────────
+  // GET /api/streams/my-streams
+  getMyStreams: async (req, res, next) => {
+    try {
+      const { rows } = await pool.query(
+        `SELECT s.*,
+                (SELECT COUNT(*) FROM cards c WHERE c.stream_id = s.id AND c.queued_for_stream = true) AS queued_card_count
+         FROM streams s
+         WHERE s.host_id = $1
+         ORDER BY s.created_at DESC`,
+        [req.user.id]
+      );
+      res.json(rows);
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  // ── GO LIVE ────────────────────────────────────────────
+  // POST /api/streams/:id/go-live
+  goLive: async (req, res, next) => {
+    try {
+      const { id: streamId } = req.params;
+      const hostId = req.user.id;
+
+      const { rows } = await pool.query(
+        'SELECT * FROM streams WHERE id = $1 AND host_id = $2',
+        [streamId, hostId]
+      );
+
+      if (rows.length === 0) {
+        return res.status(404).json({ message: 'Stream not found or unauthorized' });
+      }
+
+      const stream = rows[0];
+      if (stream.status !== 'scheduled') {
+        return res.status(400).json({ message: 'Stream must be in scheduled status to go live' });
+      }
+
+      const roomName = stream.channel_name;
+      const livekitConfig = await livekitService.generateHostToken(
+        roomName,
+        `host_${hostId}`,
+        req.user.username
+      );
+
+      await pool.query(
+        `UPDATE streams SET status = 'live', started_at = NOW() WHERE id = $1`,
+        [streamId]
+      );
+
+      // Notify subscribers
+      try {
+        const { rows: subscribers } = await pool.query(
+          `SELECT user_id FROM stream_notifications WHERE stream_id = $1 AND notified = false`,
+          [streamId]
+        );
+
+        if (subscribers.length > 0) {
+          const io = getIO();
+          for (const sub of subscribers) {
+            // Emit to user's personal room (socket joins user:{id} on connect)
+            io.to(`user:${sub.user_id}`).emit('stream-going-live', {
+              streamId: parseInt(streamId),
+              title: stream.title,
+              host_name: req.user.username,
+            });
+          }
+
+          await pool.query(
+            `UPDATE stream_notifications SET notified = true WHERE stream_id = $1`,
+            [streamId]
+          );
+        }
+      } catch (notifyErr) {
+        console.error('Error sending notifications:', notifyErr);
+        // Don't fail the go-live if notifications fail
+      }
+
+      res.json({
+        message: 'Stream is now live',
+        streamId: parseInt(streamId),
+        livekit: livekitConfig,
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  // ── NOTIFY ME ──────────────────────────────────────────
+  // POST /api/streams/:id/notify-me
+  toggleNotification: async (req, res, next) => {
+    try {
+      const { id: streamId } = req.params;
+      const userId = req.user.id;
+
+      // Check if already subscribed
+      const { rows: existing } = await pool.query(
+        'SELECT id FROM stream_notifications WHERE user_id = $1 AND stream_id = $2',
+        [userId, streamId]
+      );
+
+      if (existing.length > 0) {
+        // Unsubscribe
+        await pool.query(
+          'DELETE FROM stream_notifications WHERE user_id = $1 AND stream_id = $2',
+          [userId, streamId]
+        );
+        return res.json({ subscribed: false });
+      }
+
+      // Subscribe
+      await pool.query(
+        'INSERT INTO stream_notifications (user_id, stream_id) VALUES ($1, $2)',
+        [userId, streamId]
+      );
+      res.json({ subscribed: true });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  // ── CHECK NOTIFICATION STATUS ──────────────────────────
+  // GET /api/streams/:id/notify-status
+  getNotificationStatus: async (req, res, next) => {
+    try {
+      const { id: streamId } = req.params;
+      const userId = req.user.id;
+
+      const { rows } = await pool.query(
+        'SELECT id FROM stream_notifications WHERE user_id = $1 AND stream_id = $2',
+        [userId, streamId]
+      );
+
+      res.json({ subscribed: rows.length > 0 });
     } catch (error) {
       next(error);
     }

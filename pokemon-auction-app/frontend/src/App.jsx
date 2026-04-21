@@ -19,6 +19,7 @@ import PSAImportPage from './pages/PSAImportPage';
 import MyCardsPage from './pages/MyCardsPage';
 import BrowseCardsPage from './pages/BrowseCardsPage';
 import SellerProfilePage from './pages/SellerProfilePage';
+import UpcomingStreamsPage from './pages/UpcomingStreamsPage';
 
 // ============================================================
 // APP.JSX - The Root Component
@@ -83,6 +84,7 @@ function App() {
 
               {/* Browse routes */}
               <Route path="/cards" element={<BrowseCardsPage />} />
+              <Route path="/upcoming-streams" element={<UpcomingStreamsPage />} />
 
 
               {/* 404 - catches any unmatched routes */}

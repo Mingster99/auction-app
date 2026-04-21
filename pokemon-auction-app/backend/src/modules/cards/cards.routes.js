@@ -44,17 +44,17 @@ router.get('/:id', async (req, res, next) => {
 // Create a card (protected - must be logged in)
 router.post('/', authMiddleware, async (req, res, next) => {
   try {
-    const { name, set, rarity, condition, grading, description, imageUrl, startingBid } = req.body;
+    const { name, set, rarity, condition, grading, description, imageUrl, startingBid, buyoutPrice, auctionDurationSeconds } = req.body;
 
     if (!name || !startingBid) {
       return res.status(400).json({ message: 'Name and starting bid required' });
     }
 
     const result = await pool.query(
-      `INSERT INTO cards (seller_id, name, set, rarity, condition, grading, description, image_url, starting_bid, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'active')
+      `INSERT INTO cards (seller_id, name, set, rarity, condition, grading, description, image_url, starting_bid, status, buyout_price, auction_duration_seconds)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'active', $10, $11)
        RETURNING *`,
-      [req.user.id, name, set, rarity, condition, grading, description, imageUrl, startingBid]
+      [req.user.id, name, set, rarity, condition, grading, description, imageUrl, startingBid, buyoutPrice || null, auctionDurationSeconds || 60]
     );
 
     res.status(201).json(result.rows[0]);

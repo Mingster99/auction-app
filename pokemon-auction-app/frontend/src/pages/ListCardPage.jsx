@@ -80,6 +80,8 @@ function ListCardPage() {
     grading: '',
     description: '',
     startingBid: '',
+    buyoutPrice: '',
+    auctionDurationSeconds: '60',
     imageUrl: '',     // We'll store image URL here (Cloudinary later)
   });
 
@@ -199,6 +201,8 @@ function ListCardPage() {
         description: formData.description,
         imageUrl: formData.imageUrl,
         startingBid: parseFloat(formData.startingBid),
+        buyoutPrice: formData.buyoutPrice ? parseFloat(formData.buyoutPrice) : null,
+        auctionDurationSeconds: parseInt(formData.auctionDurationSeconds) || 60,
       });
 
       // Success! Redirect to the new card's detail page
@@ -474,6 +478,46 @@ function ListCardPage() {
               <p className="text-gray-600 text-xs mt-2">
                 This is the minimum bid. Viewers will bid higher to win.
               </p>
+            </div>
+
+            {/* Buyout Price */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Buyout Price (optional)
+              </label>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">$</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formData.buyoutPrice}
+                  onChange={(e) => handleChange('buyoutPrice', e.target.value)}
+                  placeholder="0.00"
+                  className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl pl-8 pr-4 py-3 text-sm placeholder-gray-600 focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-all"
+                />
+              </div>
+              <p className="text-gray-600 text-xs mt-2">
+                Allows a buyer to purchase instantly at this price during the auction.
+              </p>
+            </div>
+
+            {/* Auction Duration */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Auction Duration
+              </label>
+              <select
+                value={formData.auctionDurationSeconds}
+                onChange={(e) => handleChange('auctionDurationSeconds', e.target.value)}
+                className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-all"
+              >
+                <option value="30">30 seconds</option>
+                <option value="45">45 seconds</option>
+                <option value="60">60 seconds (default)</option>
+                <option value="90">90 seconds</option>
+                <option value="120">2 minutes</option>
+              </select>
             </div>
 
             {/* Pricing tips */}

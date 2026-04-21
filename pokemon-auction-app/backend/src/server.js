@@ -3,6 +3,7 @@ const http = require('http');
 const app = require('./app');
 const { initializeWebSocket } = require('./websocket/socketHandler');
 const pool = require('./config/database');
+const { recoverActiveAuctions } = require('./services/auctionService');
 
 const PORT = process.env.PORT || 5000;
 
@@ -13,12 +14,14 @@ const server = http.createServer(app);
 initializeWebSocket(server);
 
 // Test database connection
-pool.query('SELECT NOW()', (err, res) => {
+pool.query('SELECT NOW()', async (err, res) => {
   if (err) {
     console.error('❌ Database connection failed:', err.message);
     console.log('⚠️  Server will start but database features will not work');
   } else {
     console.log('✅ Database connected successfully');
+    // Recover any active auctions that were running when server last shut down
+    await recoverActiveAuctions();
   }
 });
 

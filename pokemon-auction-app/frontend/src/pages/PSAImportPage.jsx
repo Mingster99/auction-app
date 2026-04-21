@@ -29,6 +29,8 @@ function PSAImportPage() {
   const [psaData, setPsaData] = useState(null);
   const [importedCard, setImportedCard] = useState(null);
   const [startingBid, setStartingBid] = useState('');
+  const [buyoutPrice, setBuyoutPrice] = useState('');
+  const [auctionDuration, setAuctionDuration] = useState('60');
   const [selectedGame, setSelectedGame] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -148,6 +150,8 @@ function PSAImportPage() {
       const response = await api.post('/cards/psa-import', {
         certNumber: psaData.certNumber,
         startingBid: parseFloat(startingBid) || 0,
+        buyoutPrice: buyoutPrice ? parseFloat(buyoutPrice) : null,
+        auctionDurationSeconds: parseInt(auctionDuration) || 60,
         tcgGame: selectedGame,
       });
 
@@ -383,6 +387,39 @@ function PSAImportPage() {
                   step="0.01"
                 />
               </div>
+            </div>
+
+            {/* Buyout Price */}
+            <div>
+              <label className="block text-sm text-gray-400 mb-2">Buyout Price (optional — instant buy)</label>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                <input
+                  type="number"
+                  value={buyoutPrice}
+                  onChange={(e) => setBuyoutPrice(e.target.value)}
+                  placeholder="0.00"
+                  className="w-full bg-gray-900 border border-gray-700 rounded-xl pl-8 pr-4 py-3 text-white focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 outline-none"
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+            </div>
+
+            {/* Auction Duration */}
+            <div>
+              <label className="block text-sm text-gray-400 mb-2">Auction Duration</label>
+              <select
+                value={auctionDuration}
+                onChange={(e) => setAuctionDuration(e.target.value)}
+                className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 outline-none"
+              >
+                <option value="30">30 seconds</option>
+                <option value="45">45 seconds</option>
+                <option value="60">60 seconds (default)</option>
+                <option value="90">90 seconds</option>
+                <option value="120">2 minutes</option>
+              </select>
             </div>
 
             {/* Actions */}

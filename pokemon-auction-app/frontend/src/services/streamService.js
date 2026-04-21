@@ -47,5 +47,41 @@ export const streamService = {
   addCardToStream: async (streamId, cardId) => {
     const response = await api.post(`/streams/${streamId}/cards`, { cardId });
     return response.data;
-  }
+  },
+
+  // Schedule a stream
+  scheduleStream: async (streamData) => {
+    const response = await api.post('/streams/schedule', streamData);
+    return response.data;
+  },
+
+  // Get upcoming scheduled streams
+  getUpcomingStreams: async () => {
+    const response = await api.get('/streams/upcoming');
+    return response.data;
+  },
+
+  // Get seller's own streams
+  getMyStreams: async () => {
+    const response = await api.get('/streams/my-streams');
+    return response.data;
+  },
+
+  // Go live on a scheduled stream
+  goLive: async (streamId) => {
+    const response = await api.post(`/streams/${streamId}/go-live`);
+    return response.data;
+  },
+
+  // Toggle notification subscription
+  toggleNotification: async (streamId) => {
+    const response = await api.post(`/streams/${streamId}/notify-me`);
+    return response.data;
+  },
+
+  // Check notification status
+  getNotificationStatus: async (streamId) => {
+    const response = await api.get(`/streams/${streamId}/notify-status`);
+    return response.data;
+  },
 };

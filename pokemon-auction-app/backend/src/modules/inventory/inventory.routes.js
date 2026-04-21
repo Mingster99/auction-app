@@ -71,7 +71,7 @@ router.patch('/:id/price', authMiddleware, async (req, res, next) => {
 router.patch('/:id/queue', authMiddleware, async (req, res, next) => {
   try {
     const cardId = req.params.id;
-    const { queued } = req.body; // true or false
+    const { queued, stream_id } = req.body;
 
     // Verify card belongs to user
     const card = await pool.query(
@@ -85,18 +85,32 @@ router.patch('/:id/queue', authMiddleware, async (req, res, next) => {
 
     const newQueued = queued !== undefined ? Boolean(queued) : !card.rows[0].queued_for_stream;
 
+    // Auto-assign stream_id if queueing and not provided
+    let assignedStreamId = stream_id || null;
+    if (newQueued && !assignedStreamId) {
+      const { rows: upcomingStreams } = await pool.query(
+        `SELECT id FROM streams WHERE host_id = $1 AND status = 'scheduled' ORDER BY scheduled_start_time ASC`,
+        [req.user.id]
+      );
+      if (upcomingStreams.length === 1) {
+        assignedStreamId = upcomingStreams[0].id;
+      }
+    }
+
     const result = await pool.query(
       `UPDATE cards
        SET queued_for_stream = $1,
            queued_at = $2,
            status = $3,
+           stream_id = $4,
            updated_at = NOW()
-       WHERE id = $4 AND seller_id = $5
+       WHERE id = $5 AND seller_id = $6
        RETURNING *`,
       [
         newQueued,
         newQueued ? new Date() : null,
         newQueued ? 'active' : 'pending',
+        newQueued ? assignedStreamId : null,
         cardId,
         req.user.id,
       ]
@@ -112,13 +126,65 @@ router.patch('/:id/queue', authMiddleware, async (req, res, next) => {
 });
 
 
+// ── REORDER STREAM QUEUE ─────────────────────────────────
+router.patch('/queue-order', authMiddleware, async (req, res, next) => {
+  try {
+    const { cardIds } = req.body;
+
+    if (!Array.isArray(cardIds) || cardIds.length === 0) {
+      return res.status(400).json({ message: 'cardIds array is required' });
+    }
+
+    // Verify all cards belong to user
+    const { rows: owned } = await pool.query(
+      `SELECT id FROM cards WHERE seller_id = $1 AND id = ANY($2::int[])`,
+      [req.user.id, cardIds]
+    );
+
+    if (owned.length !== cardIds.length) {
+      return res.status(403).json({ message: 'Some cards do not belong to you' });
+    }
+
+    // Update queue_order in a transaction
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      for (let i = 0; i < cardIds.length; i++) {
+        await client.query(
+          'UPDATE cards SET queue_order = $1 WHERE id = $2 AND seller_id = $3',
+          [i, cardIds[i], req.user.id]
+        );
+      }
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+
+    // Return updated queue
+    const { rows } = await pool.query(
+      `SELECT * FROM cards
+       WHERE seller_id = $1 AND queued_for_stream = true
+       ORDER BY queue_order ASC NULLS LAST, queued_at ASC`,
+      [req.user.id]
+    );
+
+    res.json({ message: 'Queue order updated', queue: rows });
+  } catch (error) {
+    next(error);
+  }
+});
+
+
 // ── GET USER'S STREAM QUEUE ──────────────────────────────
 router.get('/queue', authMiddleware, async (req, res, next) => {
   try {
     const result = await pool.query(
       `SELECT * FROM cards
        WHERE seller_id = $1 AND queued_for_stream = true
-       ORDER BY queued_at ASC`,
+       ORDER BY queue_order ASC NULLS LAST, queued_at ASC`,
       [req.user.id]
     );
     res.json(result.rows);

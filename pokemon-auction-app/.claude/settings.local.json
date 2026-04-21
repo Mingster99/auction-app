@@ -1,7 +1,15 @@
 {
   "permissions": {
     "allow": [
-      "Bash(xargs grep:*)"
+      "Bash(xargs grep:*)",
+      "Bash(\"/c/Program Files/PostgreSQL/18/bin/psql.exe\" \"postgresql://postgres:password@localhost:5432/pokemon_auction\" -f src/database/migrations/010_create_invoices_and_payment_methods.sql)",
+      "Bash(\"/c/Program Files/PostgreSQL/18/bin/psql.exe\" \"postgresql://postgres:password@localhost:5432/pokemon_auction\" -c \"\\\\d cards\")",
+      "Bash(node -e \"require\\('./src/websocket/socketHandler'\\); console.log\\('socketHandler loads OK'\\)\")",
+      "Bash(npx -y acorn-jsx --ecma2020 src/hooks/useWebSocket.js)",
+      "Bash(/c/Program Files/PostgreSQL/18/bin/psql.exe:*)",
+      "Bash(node -e \"require\\('./src/modules/streams/streams.controller'\\); console.log\\('streams.controller OK'\\);\")",
+      "Bash(node -e ':*)",
+      "Bash(npx react-scripts:*)"
     ]
   }
 }

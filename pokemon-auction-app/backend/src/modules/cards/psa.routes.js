@@ -83,7 +83,7 @@ router.post('/psa-lookup', authMiddleware, async (req, res, next) => {
 // ── PSA IMPORT (save to inventory) ───────────────────────
 router.post('/psa-import', authMiddleware, async (req, res, next) => {
   try {
-    const { certNumber, startingBid, tcgGame, overrides } = req.body;
+    const { certNumber, startingBid, tcgGame, overrides, buyoutPrice, auctionDurationSeconds } = req.body;
     if (!certNumber) {
       return res.status(400).json({ message: 'Cert number is required' });
     }
@@ -128,7 +128,7 @@ router.post('/psa-import', authMiddleware, async (req, res, next) => {
         psa_subject, psa_card_number, psa_variety, psa_label_type,
         is_psa_verified, psa_population, psa_population_higher,
         card_image_front, card_image_back, image_source,
-        tcg_game
+        tcg_game, buyout_price, auction_duration_seconds
       ) VALUES (
         $1, $2, $3, $4, $5, $6, $7,
         $8, $9, $10,
@@ -137,7 +137,7 @@ router.post('/psa-import', authMiddleware, async (req, res, next) => {
         $17, $18, $19, $20,
         $21, $22, $23,
         $24, $25, $26,
-        $27
+        $27, $28, $29
       ) RETURNING *`,
       [
         req.user.id,
@@ -167,6 +167,8 @@ router.post('/psa-import', authMiddleware, async (req, res, next) => {
         psaData.backImage || null,
         psaData.imageSource || null,
         gameValue,
+        buyoutPrice || null,
+        auctionDurationSeconds || 60,
       ]
     );
 
