@@ -6,6 +6,7 @@ const streamsController = require('./streams.controller');
 // Public routes
 router.get('/active', streamsController.getActiveStreams);
 router.get('/upcoming', streamsController.getUpcomingStreams);
+router.get('/:id/queue', streamsController.getStreamQueue);
 
 // Protected routes (require authentication)
 router.get('/my-streams', authMiddleware, streamsController.getMyStreams);

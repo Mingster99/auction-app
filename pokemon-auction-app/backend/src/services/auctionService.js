@@ -116,9 +116,9 @@ async function placeBid(cardId, streamId, bidderId, amount) {
       throw new Error(`Bid must be higher than current bid of $${parseFloat(card.current_bid).toFixed(2)}`);
     }
 
-    // has_payment_method check — log warning but allow for now (Stripe not wired)
-    // const { rows: userRows } = await client.query('SELECT has_payment_method FROM users WHERE id = $1', [bidderId]);
-    // if (!userRows[0]?.has_payment_method) throw new Error('Payment method required to bid');
+    // has_payment_method check — stub is toggled by /api/users/me/payment-method
+    const { rows: userRows } = await client.query('SELECT has_payment_method FROM users WHERE id = $1', [bidderId]);
+    if (!userRows[0]?.has_payment_method) throw new Error('Payment method required to bid');
 
     // Update card
     await client.query(
@@ -194,6 +194,10 @@ async function executeBuyout(cardId, streamId, buyerId) {
     if (card.auction_status !== 'active') throw new Error('Auction is not active');
     if (!card.buyout_price) throw new Error('This card has no buyout price');
     if (buyerId === card.seller_id) throw new Error('Seller cannot buyout their own card');
+
+    // has_payment_method check
+    const { rows: buyerRows } = await client.query('SELECT has_payment_method FROM users WHERE id = $1', [buyerId]);
+    if (!buyerRows[0]?.has_payment_method) throw new Error('Payment method required to buy now');
 
     const buyoutAmount = parseFloat(card.buyout_price);
     const platformFee = parseFloat((buyoutAmount * PLATFORM_FEE_RATE).toFixed(2));

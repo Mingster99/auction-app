@@ -311,6 +311,28 @@ const streamsController = {
     }
   },
 
+  // ── GET STREAM QUEUE (public, read-only) ───────────────
+  // GET /api/streams/:id/queue
+  getStreamQueue: async (req, res, next) => {
+    try {
+      const { id: streamId } = req.params;
+      const { rows } = await pool.query(
+        `SELECT id, name, card_image_front, card_image_back, image_url,
+                psa_grade, starting_bid, buyout_price, auction_status,
+                queue_order, queued_at
+         FROM cards
+         WHERE stream_id = $1 AND queued_for_stream = true
+           AND auction_status NOT IN ('active', 'sold')
+         ORDER BY queue_order ASC NULLS LAST, queued_at ASC
+         LIMIT 20`,
+        [streamId]
+      );
+      res.json(rows);
+    } catch (error) {
+      next(error);
+    }
+  },
+
   // ── GET MY STREAMS ─────────────────────────────────────
   // GET /api/streams/my-streams
   getMyStreams: async (req, res, next) => {

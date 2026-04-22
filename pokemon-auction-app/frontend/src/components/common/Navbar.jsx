@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useNotifications } from '../../context/NotificationContext';
 import { streamService } from '../../services/streamService';
+import { formatDistanceToNow } from 'date-fns';
 
 // ============================================================
 // NAVBAR COMPONENT
@@ -17,9 +19,30 @@ import { streamService } from '../../services/streamService';
 function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [hasActiveStream, setHasActiveStream] = useState(false);
+  const [bellOpen, setBellOpen] = useState(false);
+  const bellRef = useRef(null);
   const { user, isAuthenticated, logout } = useAuth();
+  const { notifications, unreadCount, markAllRead } = useNotifications();
   const navigate = useNavigate();
   const location = useLocation(); // Gets current URL path
+
+  // Close bell dropdown on outside click
+  useEffect(() => {
+    if (!bellOpen) return;
+    const handleClick = (e) => {
+      if (bellRef.current && !bellRef.current.contains(e.target)) {
+        setBellOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [bellOpen]);
+
+  const toggleBell = () => {
+    const next = !bellOpen;
+    setBellOpen(next);
+    if (next && unreadCount > 0) markAllRead();
+  };
 
   // Check if the logged-in user is hosting an active stream
   useEffect(() => {
@@ -105,6 +128,67 @@ function Navbar() {
                 >
                   Scan PSA
                 </Link>
+
+                {/* Notification bell */}
+                <div className="relative" ref={bellRef}>
+                  <button
+                    onClick={toggleBell}
+                    className="relative p-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800/50 transition-colors"
+                    aria-label="Notifications"
+                  >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                    </svg>
+                    {unreadCount > 0 && (
+                      <span className="absolute top-1 right-1 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                      </span>
+                    )}
+                  </button>
+
+                  {bellOpen && (
+                    <div className="absolute right-0 top-full mt-2 w-80 bg-gray-900 border border-gray-700 rounded-xl shadow-xl overflow-hidden z-50">
+                      <div className="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
+                        <span className="text-sm font-bold text-white">Notifications</span>
+                      </div>
+                      <div className="max-h-96 overflow-y-auto">
+                        {notifications.length === 0 ? (
+                          <p className="text-gray-500 text-sm px-4 py-8 text-center">No notifications yet</p>
+                        ) : (
+                          notifications.map((n) => (
+                            <Link
+                              key={`${n.streamId}-${n.timestamp}`}
+                              to={`/livestream/${n.streamId}`}
+                              onClick={() => setBellOpen(false)}
+                              className="block px-4 py-3 hover:bg-gray-800 border-b border-gray-800/50 last:border-b-0 transition-colors"
+                            >
+                              <div className="flex items-start gap-3">
+                                <span className="text-lg leading-none">🔴</span>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium text-white truncate">
+                                    {n.host_name} is live
+                                  </p>
+                                  <p className="text-xs text-gray-400 truncate">{n.title}</p>
+                                  <p className="text-xs text-gray-600 mt-0.5">
+                                    {(() => {
+                                      try {
+                                        return formatDistanceToNow(new Date(n.timestamp), { addSuffix: true });
+                                      } catch {
+                                        return '';
+                                      }
+                                    })()}
+                                  </p>
+                                </div>
+                              </div>
+                            </Link>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 {/* Go live / Rejoin stream button */}
                 <Link
                   to="/stream/host"
@@ -239,6 +323,21 @@ function Navbar() {
                 >
                   {hasActiveStream ? '↩ Rejoin Stream' : '🔴 Go Live'}
                 </Link>
+                <button
+                  onClick={() => {
+                    setMobileOpen(false);
+                    if (notifications[0]) navigate(`/livestream/${notifications[0].streamId}`);
+                    markAllRead();
+                  }}
+                  className="w-full text-left px-4 py-3 text-gray-300 hover:text-white hover:bg-gray-800 rounded-xl transition-colors flex items-center gap-2"
+                >
+                  🔔 Notifications
+                  {unreadCount > 0 && (
+                    <span className="ml-auto min-w-[20px] h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center px-1.5">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
+                </button>
                 <Link
                   to="/profile"
                   onClick={() => setMobileOpen(false)}

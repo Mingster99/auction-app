@@ -1,10 +1,8 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
-
-// ── PAGE IMPORTS ──────────────────────────────────────────────
-// Each import brings in a page component from its file.
-// The string path after "from" is the relative file location.
+import { NotificationProvider } from './context/NotificationContext';
 
 import Navbar from './components/common/Navbar';
 import HomePage from './pages/HomePage';
@@ -20,91 +18,77 @@ import MyCardsPage from './pages/MyCardsPage';
 import BrowseCardsPage from './pages/BrowseCardsPage';
 import SellerProfilePage from './pages/SellerProfilePage';
 import UpcomingStreamsPage from './pages/UpcomingStreamsPage';
-
-// ============================================================
-// APP.JSX - The Root Component
-// ============================================================
-// This is the entry point of your frontend app.
-// It wraps everything in:
-//
-// 1. AuthProvider - Makes user login state available everywhere
-// 2. BrowserRouter - Enables URL-based navigation
-// 3. Routes - Defines which component shows at which URL
-//
-// HOW ROUTING WORKS:
-// When user goes to /login → LoginPage component renders
-// When user goes to /cards/new → ListCardPage component renders
-// The Navbar is OUTSIDE Routes so it shows on EVERY page
-// ============================================================
+import PaymentMethodPage from './pages/PaymentMethodPage';
 
 function App() {
   return (
-    // AuthProvider wraps everything so any component can access
-    // the logged-in user, login(), logout() functions
     <AuthProvider>
+      <NotificationProvider>
+        <BrowserRouter>
+          <div className="min-h-screen bg-gray-950 flex flex-col">
+            <Navbar />
 
-      {/* BrowserRouter enables React Router navigation */}
-      <BrowserRouter>
+            <main className="flex-1">
+              <Routes>
+                <Route path="/" element={<HomePage />} />
 
-        {/* Outer div takes full screen height, dark background */}
-        <div className="min-h-screen bg-gray-950 flex flex-col">
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/signup" element={<SignupPage />} />
+                <Route path="/profile" element={<ProfilePage />} />
 
-          {/* Navbar is outside Routes = shows on every page */}
-          <Navbar />
+                <Route path="/cards/new" element={<ListCardPage />} />
+                <Route path="/psa-import" element={<PSAImportPage />} />
+                <Route path="/card/:cardId" element={<CardDetailPage />} />
 
-          {/* Main content area - flex: 1 makes it fill remaining height */}
-          <main className="flex-1">
-            <Routes>
-              {/* Each Route maps a URL path to a component */}
-              {/* path="/" = homepage, exact match */}
-              <Route path="/" element={<HomePage />} />
+                <Route path="/seller/:username" element={<SellerProfilePage />} />
 
-              {/* Auth routes */}
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/signup" element={<SignupPage />} />
-              <Route path="/profile" element={<ProfilePage />} />
+                <Route path="/livestream/:id" element={<LivestreamPage />} />
+                <Route path="/stream/host" element={<StreamHostPage />} />
 
-              {/* Card routes */}
-              {/* /cards/new MUST come before /cards/:id */}
-              {/* Otherwise React Router might think "new" is an ID */}
-              <Route path="/cards/new" element={<ListCardPage />} />
-              <Route path="/psa-import" element={<PSAImportPage />} />  
-              <Route path="/card/:cardId" element={<CardDetailPage />} />
+                <Route path="/my-cards" element={<MyCardsPage />} />
 
-              {/* Seller Profile routes */}
-              <Route path="/seller/:username" element={<SellerProfilePage />} />
+                <Route path="/cards" element={<BrowseCardsPage />} />
+                <Route path="/upcoming-streams" element={<UpcomingStreamsPage />} />
 
-              {/* Stream routes */}
-              {/* :id means any value - accessible as params.id in component */}
-              <Route path="/livestream/:id" element={<LivestreamPage />} />
-              <Route path="/stream/host" element={<StreamHostPage />} />
+                <Route path="/settings/payment" element={<PaymentMethodPage />} />
 
-              {/* Inventory routes */}
-              <Route path="/my-cards" element={<MyCardsPage />} />
-
-              {/* Browse routes */}
-              <Route path="/cards" element={<BrowseCardsPage />} />
-              <Route path="/upcoming-streams" element={<UpcomingStreamsPage />} />
-
-
-              {/* 404 - catches any unmatched routes */}
-              <Route path="*" element={
-                <div className="min-h-screen bg-gray-950 flex items-center justify-center text-center">
-                  <div>
-                    <div className="text-8xl mb-6">404</div>
-                    <h1 className="text-3xl font-bold text-white mb-4">Page not found</h1>
-                    <p className="text-gray-500 mb-8">The page you're looking for doesn't exist.</p>
-                    <a href="/" className="bg-violet-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-violet-500 transition-all">
-                      Go Home
-                    </a>
+                <Route path="*" element={
+                  <div className="min-h-screen bg-gray-950 flex items-center justify-center text-center">
+                    <div>
+                      <div className="text-8xl mb-6">404</div>
+                      <h1 className="text-3xl font-bold text-white mb-4">Page not found</h1>
+                      <p className="text-gray-500 mb-8">The page you're looking for doesn't exist.</p>
+                      <a href="/" className="bg-violet-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-violet-500 transition-all">
+                        Go Home
+                      </a>
+                    </div>
                   </div>
-                </div>
-              } />
-            </Routes>
-          </main>
+                } />
+              </Routes>
+            </main>
+          </div>
 
-        </div>
-      </BrowserRouter>
+          <Toaster
+            position="top-right"
+            toastOptions={{
+              duration: 3500,
+              style: {
+                background: '#1a1f2e',
+                color: '#fff',
+                border: '1px solid #374151',
+                borderRadius: '12px',
+                fontSize: '14px',
+              },
+              success: {
+                iconTheme: { primary: '#10b981', secondary: '#fff' },
+              },
+              error: {
+                iconTheme: { primary: '#ef4444', secondary: '#fff' },
+              },
+            }}
+          />
+        </BrowserRouter>
+      </NotificationProvider>
     </AuthProvider>
   );
 }

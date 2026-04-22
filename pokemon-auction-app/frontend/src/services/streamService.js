@@ -43,6 +43,12 @@ export const streamService = {
     return response.data;
   },
 
+  // Public read-only queue preview (buyer-facing "up next")
+  getStreamQueue: async (streamId) => {
+    const response = await api.get(`/streams/${streamId}/queue`);
+    return response.data;
+  },
+
   // Add card to stream queue
   addCardToStream: async (streamId, cardId) => {
     const response = await api.post(`/streams/${streamId}/cards`, { cardId });

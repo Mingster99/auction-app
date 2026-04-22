@@ -46,11 +46,16 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
   };
 
+  const updateUser = (updates) => {
+    setUser((prev) => (prev ? { ...prev, ...updates } : prev));
+  };
+
   const value = {
     user,
     login,
     signup,
     logout,
+    updateUser,
     isAuthenticated: !!user,
     loading
   };

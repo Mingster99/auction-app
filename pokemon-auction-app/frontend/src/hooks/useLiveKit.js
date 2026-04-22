@@ -109,6 +109,13 @@ export const useLiveKit = () => {
 
   // ── JOIN AS HOST ────────────────────────────────────────
   const joinAsHost = useCallback(async (wsUrl, token) => {
+    // Idempotent — if a room is already being created/connected, skip.
+    // Prevents two concurrent sessions with the same identity, which LiveKit
+    // resolves by kicking the older session.
+    if (roomRef.current) {
+      console.warn('⏭  joinAsHost ignored — room already exists');
+      return;
+    }
     try {
       console.log('🎥 Joining as host...');
       setError(null);
@@ -174,6 +181,12 @@ export const useLiveKit = () => {
 
   // ── JOIN AS VIEWER ──────────────────────────────────────
   const joinAsViewer = useCallback(async (wsUrl, token) => {
+    // Idempotent — if a room is already being created/connected, skip.
+    // Prevents a second session with the same viewer identity from kicking the first.
+    if (roomRef.current) {
+      console.warn('⏭  joinAsViewer ignored — room already exists');
+      return;
+    }
     try {
       console.log('👁️  Joining as viewer...');
       setError(null);
@@ -183,6 +196,8 @@ export const useLiveKit = () => {
         dynacast: true,
       });
 
+      // Reserve the slot synchronously, before the async connect — otherwise
+      // a concurrent caller could pass the guard above and create a second Room.
       roomRef.current = room;
       setupListeners(room);
 
@@ -196,6 +211,8 @@ export const useLiveKit = () => {
       setIsHostPresent(hostAlreadyPresent);
     } catch (err) {
       console.error('❌ Failed to join as viewer:', err);
+      // Release the slot so a retry can construct a fresh Room.
+      roomRef.current = null;
       setError(err.message);
       throw err;
     }
