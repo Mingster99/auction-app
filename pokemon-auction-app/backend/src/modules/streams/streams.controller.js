@@ -9,13 +9,16 @@ const { getIO } = require('../../websocket/socketHandler');
 const streamsController = {
 
   // ── GET ACTIVE STREAMS ──────────────────────────────────
+  // "Active" = currently broadcasting. Scheduled streams have their own
+  // endpoint (GET /upcoming) — including them here mislabels them as live
+  // on the home page and in the navbar's "rejoin" check.
   getActiveStreams: async (req, res, next) => {
     try {
       const result = await pool.query(
         `SELECT s.*, u.username as host_name
          FROM streams s
          JOIN users u ON s.host_id = u.id
-         WHERE s.status IN ('live', 'scheduled')
+         WHERE s.status = 'live'
          ORDER BY s.started_at DESC`
       );
       res.json(result.rows);
@@ -207,6 +210,10 @@ const streamsController = {
   },
 
   // ── END STREAM ─────────────────────────────────────────
+  // Same endpoint handles both "end a live stream" and "cancel a scheduled stream":
+  //   live      → ended
+  //   scheduled → cancelled
+  // Anything else (already ended/cancelled or not owned by this user) → 404.
   endStream: async (req, res, next) => {
     try {
       const { id: streamId } = req.params;
@@ -214,9 +221,14 @@ const streamsController = {
 
       const result = await pool.query(
         `UPDATE streams
-         SET status = 'ended',
+         SET status = CASE status
+                        WHEN 'live'      THEN 'ended'
+                        WHEN 'scheduled' THEN 'cancelled'
+                      END,
              ended_at = NOW()
-         WHERE id = $1 AND host_id = $2 AND status = 'live'
+         WHERE id = $1
+           AND host_id = $2
+           AND status IN ('live', 'scheduled')
          RETURNING *`,
         [streamId, hostId]
       );
@@ -227,9 +239,12 @@ const streamsController = {
         });
       }
 
+      const stream = result.rows[0];
       res.json({
-        message: 'Stream ended successfully',
-        stream: result.rows[0],
+        message: stream.status === 'cancelled'
+          ? 'Stream cancelled'
+          : 'Stream ended successfully',
+        stream,
       });
     } catch (error) {
       next(error);

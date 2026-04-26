@@ -9,7 +9,21 @@
       "Bash(/c/Program Files/PostgreSQL/18/bin/psql.exe:*)",
       "Bash(node -e \"require\\('./src/modules/streams/streams.controller'\\); console.log\\('streams.controller OK'\\);\")",
       "Bash(node -e ':*)",
-      "Bash(npx react-scripts:*)"
+      "Bash(npx react-scripts:*)",
+      "Bash(node -c src/modules/seller/seller.routes.js)",
+      "Bash(node -c src/modules/seller/seller.controller.js)",
+      "Bash(node -c src/app.js)",
+      "Bash(CI=true npx --no-install react-scripts build)",
+      "Bash(node -c src/services/auctionService.js)",
+      "Bash(node -c src/utils/fees.js)",
+      "Bash(node -c src/modules/invoices/invoices.routes.js)",
+      "Bash(node -c src/modules/invoices/invoices.controller.js)",
+      "Bash(node -c src/modules/admin/admin.routes.js)",
+      "Bash(node -c src/modules/admin/admin.controller.js)",
+      "Bash(node -c src/modules/auth/auth.service.js)",
+      "Bash(PGPASSWORD=password psql *)",
+      "Read(//c/Program Files/PostgreSQL//**)",
+      "Read(//c/Program Files \\(x86\\)/**)"
     ]
   }
 }

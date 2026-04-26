@@ -223,6 +223,14 @@ function Navbar() {
                       >
                         👤 My Profile
                       </Link>
+                      {user?.is_verified_seller && (
+                        <Link
+                          to="/dashboard"
+                          className="block px-4 py-2.5 text-sm text-violet-300 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+                        >
+                          📊 Dashboard
+                        </Link>
+                      )}
                       <Link
                         to="/my-cards"
                         className="block px-4 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
@@ -230,11 +238,25 @@ function Navbar() {
                         🎴 My Cards
                       </Link>
                       <Link
+                        to="/my-invoices"
+                        className="block px-4 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+                      >
+                        📄 My Invoices
+                      </Link>
+                      <Link
                         to="/my-bids"
                         className="block px-4 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
                       >
                         💰 My Bids
                       </Link>
+                      {user?.is_admin && (
+                        <Link
+                          to="/admin"
+                          className="block px-4 py-2.5 text-sm text-amber-300 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+                        >
+                          🛡 Admin Review
+                        </Link>
+                      )}
                       <div className="h-px bg-gray-800 my-1" />
                       <button
                         onClick={handleLogout}
@@ -338,6 +360,31 @@ function Navbar() {
                     </span>
                   )}
                 </button>
+                {user?.is_verified_seller && (
+                  <Link
+                    to="/dashboard"
+                    onClick={() => setMobileOpen(false)}
+                    className="block px-4 py-3 text-violet-300 hover:text-white hover:bg-gray-800 rounded-xl transition-colors"
+                  >
+                    📊 Dashboard
+                  </Link>
+                )}
+                <Link
+                  to="/my-invoices"
+                  onClick={() => setMobileOpen(false)}
+                  className="block px-4 py-3 text-gray-300 hover:text-white hover:bg-gray-800 rounded-xl transition-colors"
+                >
+                  📄 My Invoices
+                </Link>
+                {user?.is_admin && (
+                  <Link
+                    to="/admin"
+                    onClick={() => setMobileOpen(false)}
+                    className="block px-4 py-3 text-amber-300 hover:text-white hover:bg-gray-800 rounded-xl transition-colors"
+                  >
+                    🛡 Admin Review
+                  </Link>
+                )}
                 <Link
                   to="/profile"
                   onClick={() => setMobileOpen(false)}

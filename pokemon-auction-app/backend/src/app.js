@@ -11,6 +11,10 @@ const bidRoutes = require('./modules/bids/bids.routes');
 const errorMiddleware = require('./middleware/error.middleware');
 const inventoryRoutes = require('./modules/inventory/inventory.routes');
 const browseRoutes = require('./modules/browse/browse.routes');
+const sellerRoutes = require('./modules/seller/seller.routes');
+const profileRoutes = require('./modules/profile/profile.routes');
+const invoiceRoutes = require('./modules/invoices/invoices.routes');
+const adminRoutes = require('./modules/admin/admin.routes');
 
 const app = express();
 
@@ -37,7 +41,11 @@ app.use('/api/cards', cardRoutes);
 app.use('/api/streams', streamRoutes);
 app.use('/api/bids', bidRoutes);
 app.use('/api/inventory', inventoryRoutes);
-app.use('/api/browse', browseRoutes); 
+app.use('/api/browse', browseRoutes);
+app.use('/api/seller', sellerRoutes);
+app.use('/api/profile', profileRoutes);
+app.use('/api/invoices', invoiceRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Error handling middleware (must be last)
 app.use(errorMiddleware);

@@ -6,12 +6,12 @@ const {
   broadcastTimeExtension,
   broadcastAuctionState,
 } = require('../websocket/socketHandler');
+const { calculatePlatformFee } = require('../utils/fees');
 
 // ── Timer & Rate-Limit State ─────────────────────────────
 const auctionTimers = new Map();    // cardId → timeoutId
 const lastBidTime = new Map();      // odanIduserId → timestamp (rate limit)
 
-const PLATFORM_FEE_RATE = 0.05;    // 5% platform fee
 const ANTI_SNIPE_WINDOW = 30;      // seconds
 const ANTI_SNIPE_EXTENSION = 30;   // seconds
 const BID_RATE_LIMIT_MS = 500;     // min ms between bids per user
@@ -200,8 +200,7 @@ async function executeBuyout(cardId, streamId, buyerId) {
     if (!buyerRows[0]?.has_payment_method) throw new Error('Payment method required to buy now');
 
     const buyoutAmount = parseFloat(card.buyout_price);
-    const platformFee = parseFloat((buyoutAmount * PLATFORM_FEE_RATE).toFixed(2));
-    const sellerPayout = parseFloat((buyoutAmount - platformFee).toFixed(2));
+    const { platformFee, sellerPayout } = calculatePlatformFee(buyoutAmount);
 
     // Update card
     await client.query(
@@ -284,8 +283,7 @@ async function endAuction(cardId) {
     if (card.current_bidder_id) {
       // We have a winner
       const winAmount = parseFloat(card.current_bid);
-      const platformFee = parseFloat((winAmount * PLATFORM_FEE_RATE).toFixed(2));
-      const sellerPayout = parseFloat((winAmount - platformFee).toFixed(2));
+      const { platformFee, sellerPayout } = calculatePlatformFee(winAmount);
 
       await client.query(
         `UPDATE cards SET auction_status = 'sold', winner_id = current_bidder_id, status = 'sold' WHERE id = $1`,

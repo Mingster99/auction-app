@@ -19,6 +19,11 @@ import BrowseCardsPage from './pages/BrowseCardsPage';
 import SellerProfilePage from './pages/SellerProfilePage';
 import UpcomingStreamsPage from './pages/UpcomingStreamsPage';
 import PaymentMethodPage from './pages/PaymentMethodPage';
+import DashboardPage from './pages/DashboardPage';
+import RequireVerifiedSeller from './components/common/RequireVerifiedSeller';
+import MyInvoicesPage from './pages/MyInvoicesPage';
+import AdminReviewPage from './pages/AdminReviewPage';
+import RequireAdmin from './components/common/RequireAdmin';
 
 function App() {
   return (
@@ -51,6 +56,16 @@ function App() {
                 <Route path="/upcoming-streams" element={<UpcomingStreamsPage />} />
 
                 <Route path="/settings/payment" element={<PaymentMethodPage />} />
+
+                <Route element={<RequireVerifiedSeller />}>
+                  <Route path="/dashboard" element={<DashboardPage />} />
+                </Route>
+
+                <Route path="/my-invoices" element={<MyInvoicesPage />} />
+
+                <Route element={<RequireAdmin />}>
+                  <Route path="/admin" element={<AdminReviewPage />} />
+                </Route>
 
                 <Route path="*" element={
                   <div className="min-h-screen bg-gray-950 flex items-center justify-center text-center">
