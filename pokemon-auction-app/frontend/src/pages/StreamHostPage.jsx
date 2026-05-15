@@ -73,10 +73,10 @@ function CardDetailModal({ card, onClose, onStartAuction, canStartAuction }) {
           <h2 className="text-xl font-black text-white">{card.name}</h2>
 
           <div className="grid grid-cols-2 gap-3">
-            {card.psa_grade && (
+            {card.grading && (
               <div className="bg-blue-600/10 border border-blue-600/20 rounded-xl px-4 py-3">
                 <p className="text-xs text-blue-400 mb-0.5">PSA Grade</p>
-                <p className="text-lg font-black text-blue-300">{card.psa_grade}</p>
+                <p className="text-lg font-black text-blue-300">{card.grading}</p>
               </div>
             )}
             {card.set && (
@@ -345,14 +345,24 @@ function StreamHost() {
       ].slice(0, 20));
     });
     socket.on('auction-ended', (data) => {
-      setQueue((prev) =>
-        prev.map((c) => {
+      setQueue((prev) => {
+        const updated = prev.map((c) => {
           if (c.id === data.cardId) {
-            return { ...c, auction_status: data.winner ? 'sold' : 'ended' };
+            const newStatus = data.reserveNotMet ? 'idle' : (data.winner ? 'sold' : 'ended');
+            return { ...c, auction_status: newStatus };
           }
           return c;
-        })
-      );
+        });
+        // Move reserve-not-met card to the end of the queue display
+        if (data.reserveNotMet) {
+          const idx = updated.findIndex((c) => c.id === data.cardId);
+          if (idx !== -1) {
+            const [card] = updated.splice(idx, 1);
+            updated.push(card);
+          }
+        }
+        return updated;
+      });
     });
     socket.on('card-skipped', (data) => {
       setQueue((prev) => prev.filter((c) => c.id !== data.cardId));
@@ -780,6 +790,18 @@ function StreamHost() {
                         Buyout: ${parseFloat(auctionState.card.buyout_price).toFixed(2)}
                       </p>
                     )}
+                    {auctionState.card.reserve_price && (() => {
+                      const currentAmount = parseFloat(
+                        auctionState.current_bid || auctionState.card.current_bid || auctionState.card.starting_bid || 0
+                      );
+                      const reserveMet = currentAmount >= parseFloat(auctionState.card.reserve_price);
+                      return (
+                        <p className={`text-xs mt-1 font-medium ${reserveMet ? 'text-green-400' : 'text-amber-400'}`}>
+                          Reserve: ${parseFloat(auctionState.card.reserve_price).toFixed(2)}{' '}
+                          {reserveMet ? '✓ Met' : '✗ Not met'}
+                        </p>
+                      );
+                    })()}
                   </div>
 
                   {/* Live Bid Feed */}
@@ -825,9 +847,11 @@ function StreamHost() {
                   <h3 className="font-bold text-sm text-gray-400 mb-2">
                     {auctionState.result.isCancelled
                       ? 'AUCTION CANCELLED'
-                      : auctionState.result.winner
-                        ? 'SOLD!'
-                        : 'NO BIDS'}
+                      : auctionState.result.reserveNotMet
+                        ? 'RESERVE NOT MET'
+                        : auctionState.result.winner
+                          ? 'SOLD!'
+                          : 'NO BIDS'}
                   </h3>
                   {auctionState.result.winner && (
                     <p className="text-green-400">
@@ -838,6 +862,11 @@ function StreamHost() {
                       {auctionState.result.isBuyout && (
                         <span className="ml-2 text-amber-400 text-sm">(Buyout)</span>
                       )}
+                    </p>
+                  )}
+                  {auctionState.result.reserveNotMet && (
+                    <p className="text-amber-400 text-sm">
+                      Highest bid was ${parseFloat(auctionState.result.amount || 0).toFixed(2)} — card re-queued at end of stream.
                     </p>
                   )}
                 </div>

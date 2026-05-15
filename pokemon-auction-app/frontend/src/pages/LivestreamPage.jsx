@@ -536,6 +536,18 @@ function StreamViewer() {
                       </span>
                     )}
                   </div>
+                  {card.reserve_price && (
+                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-800">
+                      <span className="text-gray-500 text-xs">
+                        Reserve: ${parseFloat(card.reserve_price).toFixed(2)}
+                      </span>
+                      {currentBidAmount >= parseFloat(card.reserve_price) ? (
+                        <span className="text-green-400 text-xs font-bold">✓ Reserve met</span>
+                      ) : (
+                        <span className="text-amber-400 text-xs">Reserve not met</span>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Quick bids */}
@@ -666,7 +678,11 @@ function StreamViewer() {
                   </div>
                 )}
                 {!auctionState.result.winner && !auctionState.result.isCancelled && (
-                  <p className="text-gray-500 text-sm">No bids placed</p>
+                  <p className="text-amber-400 text-sm">
+                    {auctionState.result.reserveNotMet
+                      ? `Reserve not met — highest bid was $${parseFloat(auctionState.result.amount || 0).toFixed(2)}. Card re-queued.`
+                      : 'No bids placed'}
+                  </p>
                 )}
               </div>
             )}

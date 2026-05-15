@@ -157,6 +157,7 @@ async function placeBid(cardId, streamId, bidderId, amount) {
       bidderId,
       newEndTime,
       timestamp: new Date(),
+      reserveMet: card.reserve_price ? bidAmount >= parseFloat(card.reserve_price) : null,
     };
 
     broadcastNewBid(streamId, bidData);
@@ -281,40 +282,70 @@ async function endAuction(cardId) {
     let resultData;
 
     if (card.current_bidder_id) {
-      // We have a winner
       const winAmount = parseFloat(card.current_bid);
-      const { platformFee, sellerPayout } = calculatePlatformFee(winAmount);
+      const reserveNotMet = card.reserve_price && winAmount < parseFloat(card.reserve_price);
 
-      await client.query(
-        `UPDATE cards SET auction_status = 'sold', winner_id = current_bidder_id, status = 'sold' WHERE id = $1`,
-        [cardId]
-      );
+      if (reserveNotMet) {
+        // Reserve not met — reset card to idle and move to end of stream queue
+        await client.query(
+          `UPDATE cards SET
+            auction_status = 'idle',
+            current_bid = starting_bid,
+            current_bidder_id = NULL,
+            auction_started_at = NULL,
+            auction_ends_at = NULL,
+            queue_order = (
+              SELECT COALESCE(MAX(c2.queue_order), 0) + 1
+              FROM cards c2
+              WHERE c2.stream_id = $2 AND c2.queued_for_stream = true AND c2.id != $1
+            )
+          WHERE id = $1`,
+          [cardId, card.stream_id]
+        );
 
-      // Mark winning bid (use subquery for PostgreSQL compatibility)
-      await client.query(
-        `UPDATE bids SET is_winning_bid = true
-         WHERE id = (
-           SELECT id FROM bids
-           WHERE card_id = $1 AND bidder_id = $2 AND amount = $3 AND is_winning_bid = false
-           ORDER BY placed_at DESC LIMIT 1
-         )`,
-        [cardId, card.current_bidder_id, card.current_bid]
-      );
+        resultData = {
+          cardId,
+          isBuyout: false,
+          reserveNotMet: true,
+          winner: null,
+          winnerId: null,
+          amount: winAmount,
+        };
+      } else {
+        // Reserve met (or no reserve) — normal sale
+        const { platformFee, sellerPayout } = calculatePlatformFee(winAmount);
 
-      // Create invoice
-      await client.query(
-        `INSERT INTO invoices (buyer_id, seller_id, card_id, stream_id, amount, platform_fee_amount, seller_payout_amount, status)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')`,
-        [card.current_bidder_id, card.seller_id, cardId, card.stream_id, winAmount, platformFee, sellerPayout]
-      );
+        await client.query(
+          `UPDATE cards SET auction_status = 'sold', winner_id = current_bidder_id, status = 'sold' WHERE id = $1`,
+          [cardId]
+        );
 
-      resultData = {
-        cardId,
-        isBuyout: false,
-        winner: card.winner_username,
-        winnerId: card.current_bidder_id,
-        amount: winAmount,
-      };
+        // Mark winning bid
+        await client.query(
+          `UPDATE bids SET is_winning_bid = true
+           WHERE id = (
+             SELECT id FROM bids
+             WHERE card_id = $1 AND bidder_id = $2 AND amount = $3 AND is_winning_bid = false
+             ORDER BY placed_at DESC LIMIT 1
+           )`,
+          [cardId, card.current_bidder_id, card.current_bid]
+        );
+
+        // Create invoice
+        await client.query(
+          `INSERT INTO invoices (buyer_id, seller_id, card_id, stream_id, amount, platform_fee_amount, seller_payout_amount, status)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')`,
+          [card.current_bidder_id, card.seller_id, cardId, card.stream_id, winAmount, platformFee, sellerPayout]
+        );
+
+        resultData = {
+          cardId,
+          isBuyout: false,
+          winner: card.winner_username,
+          winnerId: card.current_bidder_id,
+          amount: winAmount,
+        };
+      }
     } else {
       // No bids — no sale
       await client.query(

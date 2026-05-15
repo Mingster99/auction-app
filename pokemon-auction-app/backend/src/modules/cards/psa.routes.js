@@ -35,6 +35,21 @@ const upload = multer({
 });
 
 
+// ── CARD IMAGE UPLOAD ────────────────────────────────────
+router.post('/upload-image', authMiddleware, upload.single('image'), async (req, res, next) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'No image provided' });
+    }
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const url = `${baseUrl}/uploads/cards/${req.file.filename}`;
+    res.json({ url });
+  } catch (error) {
+    next(error);
+  }
+});
+
+
 // ── PSA LOOKUP (preview, no save) ────────────────────────
 router.post('/psa-lookup', authMiddleware, async (req, res, next) => {
   try {
@@ -83,7 +98,7 @@ router.post('/psa-lookup', authMiddleware, async (req, res, next) => {
 // ── PSA IMPORT (save to inventory) ───────────────────────
 router.post('/psa-import', authMiddleware, async (req, res, next) => {
   try {
-    const { certNumber, startingBid, tcgGame, overrides, buyoutPrice, auctionDurationSeconds } = req.body;
+    const { certNumber, startingBid, tcgGame, overrides, buyoutPrice, reservePrice, auctionDurationSeconds } = req.body;
     if (!certNumber) {
       return res.status(400).json({ message: 'Cert number is required' });
     }
@@ -128,7 +143,7 @@ router.post('/psa-import', authMiddleware, async (req, res, next) => {
         psa_subject, psa_card_number, psa_variety, psa_label_type,
         is_psa_verified, psa_population, psa_population_higher,
         card_image_front, card_image_back, image_source,
-        tcg_game, buyout_price, auction_duration_seconds
+        tcg_game, buyout_price, reserve_price, auction_duration_seconds
       ) VALUES (
         $1, $2, $3, $4, $5, $6, $7,
         $8, $9, $10,
@@ -137,7 +152,7 @@ router.post('/psa-import', authMiddleware, async (req, res, next) => {
         $17, $18, $19, $20,
         $21, $22, $23,
         $24, $25, $26,
-        $27, $28, $29
+        $27, $28, $29, $30
       ) RETURNING *`,
       [
         req.user.id,
@@ -168,6 +183,7 @@ router.post('/psa-import', authMiddleware, async (req, res, next) => {
         psaData.imageSource || null,
         gameValue,
         buyoutPrice || null,
+        reservePrice || null,
         auctionDurationSeconds || 60,
       ]
     );

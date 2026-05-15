@@ -438,10 +438,10 @@ function BrowseCardDetailModal({ card, onClose }) {
                 <p className="text-sm text-white font-bold">{GAME_LABELS[card.tcg_game] || card.tcg_game}</p>
               </div>
             )}
-            {card.psa_grade && (
+            {card.grading && (
               <div>
                 <p className="text-xs text-gray-500">Grade</p>
-                <p className="text-sm text-white font-bold">{card.psa_grade}</p>
+                <p className="text-sm text-white font-bold">{card.grading}</p>
               </div>
             )}
             {card.psa_year && (

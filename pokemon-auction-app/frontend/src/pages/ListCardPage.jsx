@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { cardService } from '../services/cardService';
+import api from '../services/api';
 
 // ============================================================
 // HOW THIS FILE WORKS (React Explanation for Beginners)
@@ -39,6 +40,21 @@ import { cardService } from '../services/cardService';
 //    to avoid overwhelming the user with all fields at once.
 // ============================================================
 
+const TCG_GAMES = [
+  { value: 'pokemon',   label: 'Pokémon' },
+  { value: 'onepiece',  label: 'One Piece' },
+  { value: 'dbs',       label: 'Dragon Ball Super' },
+  { value: 'yugioh',    label: 'Yu-Gi-Oh!' },
+  { value: 'mtg',       label: 'Magic: The Gathering' },
+  { value: 'digimon',   label: 'Digimon' },
+  { value: 'cardfight',  label: 'Cardfight!! Vanguard' },
+  { value: 'weiss',     label: 'Weiss Schwarz' },
+  { value: 'lorcana',   label: 'Disney Lorcana' },
+  { value: 'flesh',     label: 'Flesh and Blood' },
+  { value: 'union',     label: 'Union Arena' },
+  { value: 'other',     label: 'Other TCG' },
+];
+
 // Rarity options for the dropdown
 const RARITIES = [
   'Common',
@@ -66,7 +82,10 @@ function ListCardPage() {
 
   // ── STATE ──────────────────────────────────────────────────
   const [step, setStep] = useState(1);           // Which step of the form we're on
-  const [imagePreview, setImagePreview] = useState(null); // Preview of selected image
+  const [imagePreview, setImagePreview] = useState(null);
+  const [imageUploading, setImageUploading] = useState(false);
+  const [backImagePreview, setBackImagePreview] = useState(null);
+  const [backImageUploading, setBackImageUploading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -74,15 +93,18 @@ function ListCardPage() {
   // This is the data we'll send to the backend
   const [formData, setFormData] = useState({
     name: '',
+    tcgGame: '',
     set: '',
     rarity: '',
     condition: '',
     grading: '',
     description: '',
     startingBid: '',
+    reservePrice: '',
     buyoutPrice: '',
     auctionDurationSeconds: '60',
-    imageUrl: '',     // We'll store image URL here (Cloudinary later)
+    imageUrl: '',
+    backImageUrl: '',
   });
 
   const { isAuthenticated } = useAuth();
@@ -119,18 +141,15 @@ function ListCardPage() {
     // The ... spreads all existing fields, then overrides 'name'
   };
 
-  // Called when user selects an image file
-  const handleImageChange = (e) => {
-    const file = e.target.files[0]; // Get first selected file
+  // Called when user selects an image file — uploads immediately, stores URL
+  const handleImageChange = async (e) => {
+    const file = e.target.files[0];
     if (!file) return;
 
-    // Check file type
     if (!file.type.startsWith('image/')) {
       setError('Please select an image file');
       return;
     }
-
-    // Check file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       setError('Image must be smaller than 5MB');
       return;
@@ -138,15 +157,60 @@ function ListCardPage() {
 
     setError('');
 
-    // FileReader converts file to a URL so we can preview it
+    // Show local preview immediately while uploading
     const reader = new FileReader();
-    reader.onload = (event) => {
-      setImagePreview(event.target.result); // Show preview
-      setFormData({ ...formData, imageUrl: event.target.result });
-      // NOTE: In production, we'd upload to Cloudinary here
-      // and store the Cloudinary URL, not the base64 data
-    };
-    reader.readAsDataURL(file); // Start reading the file
+    reader.onload = (event) => setImagePreview(event.target.result);
+    reader.readAsDataURL(file);
+
+    setImageUploading(true);
+    try {
+      const data = new FormData();
+      data.append('image', file);
+      const response = await api.post('/cards/upload-image', data, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setFormData(prev => ({ ...prev, imageUrl: response.data.url }));
+    } catch (err) {
+      setError('Image upload failed. Please try again.');
+      setImagePreview(null);
+    } finally {
+      setImageUploading(false);
+    }
+  };
+
+  const handleBackImageChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setError('Please select an image file');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Image must be smaller than 5MB');
+      return;
+    }
+
+    setError('');
+
+    const reader = new FileReader();
+    reader.onload = (event) => setBackImagePreview(event.target.result);
+    reader.readAsDataURL(file);
+
+    setBackImageUploading(true);
+    try {
+      const data = new FormData();
+      data.append('image', file);
+      const response = await api.post('/cards/upload-image', data, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setFormData(prev => ({ ...prev, backImageUrl: response.data.url }));
+    } catch (err) {
+      setError('Back image upload failed. Please try again.');
+      setBackImagePreview(null);
+    } finally {
+      setBackImageUploading(false);
+    }
   };
 
   // Validate Step 1 before allowing to proceed
@@ -155,8 +219,20 @@ function ListCardPage() {
       setError('Card name is required');
       return false;
     }
+    if (!formData.tcgGame) {
+      setError('Please select a card game');
+      return false;
+    }
     if (!formData.condition) {
       setError('Please select a condition');
+      return false;
+    }
+    if (!formData.imageUrl) {
+      setError('Please upload a front photo');
+      return false;
+    }
+    if (!formData.backImageUrl) {
+      setError('Please upload a back photo');
       return false;
     }
     setError('');
@@ -165,9 +241,28 @@ function ListCardPage() {
 
   // Validate Step 2 before submitting
   const validateStep2 = () => {
-    if (!formData.startingBid || parseFloat(formData.startingBid) <= 0) {
+    const startingBid = parseFloat(formData.startingBid);
+    if (!formData.startingBid || startingBid <= 0) {
       setError('Please enter a valid starting bid');
       return false;
+    }
+    if (formData.reservePrice) {
+      const reserve = parseFloat(formData.reservePrice);
+      if (reserve <= startingBid) {
+        setError('Reserve price must be greater than the starting bid');
+        return false;
+      }
+      if (formData.buyoutPrice && reserve >= parseFloat(formData.buyoutPrice)) {
+        setError('Reserve price must be less than the buyout price');
+        return false;
+      }
+    }
+    if (formData.buyoutPrice) {
+      const buyout = parseFloat(formData.buyoutPrice);
+      if (buyout <= startingBid) {
+        setError('Buyout price must be greater than the starting bid');
+        return false;
+      }
     }
     setError('');
     return true;
@@ -194,13 +289,16 @@ function ListCardPage() {
       // cardService.createCard sends our formData to the API
       const newCard = await cardService.createCard({
         name: formData.name,
+        tcgGame: formData.tcgGame,
         set: formData.set,
         rarity: formData.rarity,
         condition: formData.condition,
         grading: formData.grading,
         description: formData.description,
         imageUrl: formData.imageUrl,
+        backImageUrl: formData.backImageUrl || null,
         startingBid: parseFloat(formData.startingBid),
+        reservePrice: formData.reservePrice ? parseFloat(formData.reservePrice) : null,
         buyoutPrice: formData.buyoutPrice ? parseFloat(formData.buyoutPrice) : null,
         auctionDurationSeconds: parseInt(formData.auctionDurationSeconds) || 60,
       });
@@ -292,6 +390,23 @@ function ListCardPage() {
               />
             </div>
 
+            {/* Card Game */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Card Game <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={formData.tcgGame}
+                onChange={(e) => handleChange('tcgGame', e.target.value)}
+                className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-all"
+              >
+                <option value="">Select card game...</option>
+                {TCG_GAMES.map((game) => (
+                  <option key={game.value} value={game.value}>{game.label}</option>
+                ))}
+              </select>
+            </div>
+
             {/* Set Name */}
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -352,13 +467,13 @@ function ListCardPage() {
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
                 Professional Grading
-                <span className="text-gray-600 font-normal ml-2">(optional)</span>
+                <span className="text-gray-600 font-normal ml-2"> (leave blank if ungraded)</span>
               </label>
               <input
                 type="text"
                 value={formData.grading}
                 onChange={(e) => handleChange('grading', e.target.value)}
-                placeholder="e.g. PSA 9, BGS 8.5, CGC 10..."
+                placeholder="e.g. PSA 10, BGS 10, CGC 10..."
                 className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm placeholder-gray-600 focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-all"
               />
             </div>
@@ -380,56 +495,86 @@ function ListCardPage() {
 
             {/* Image Upload */}
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Card Photo
+              <label className="block text-sm font-medium text-gray-300 mb-3">
+                Card Photos
               </label>
+              <div className="grid grid-cols-2 gap-4">
 
-              {/* Image preview - shows when an image is selected */}
-              {imagePreview ? (
-                <div className="relative mb-4">
-                  <img
-                    src={imagePreview}
-                    alt="Card preview"
-                    className="w-full h-64 object-contain bg-gray-800 rounded-xl"
-                  />
-                  {/* Remove image button */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setImagePreview(null);
-                      handleChange('imageUrl', '');
-                    }}
-                    className="absolute top-3 right-3 bg-red-600 hover:bg-red-500 text-white w-8 h-8 rounded-full flex items-center justify-center transition-all"
-                  >
-                    ✕
-                  </button>
+                {/* Front */}
+                <div>
+                  <p className="text-xs text-gray-500 mb-2 font-medium">FRONT</p>
+                  {imagePreview ? (
+                    <div className="relative aspect-[3/4]">
+                      <img src={imagePreview} alt="Front" className="w-full h-full object-contain bg-gray-800 rounded-xl" />
+                      {imageUploading && (
+                        <div className="absolute inset-0 bg-black/50 rounded-xl flex items-center justify-center">
+                          <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                          </svg>
+                        </div>
+                      )}
+                      {!imageUploading && (
+                        <button type="button" onClick={() => { setImagePreview(null); handleChange('imageUrl', ''); }}
+                          className="absolute top-2 right-2 bg-red-600 hover:bg-red-500 text-white w-7 h-7 rounded-full flex items-center justify-center text-xs transition-all">
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <label className="cursor-pointer block">
+                      <div className="border-2 border-dashed border-gray-700 rounded-xl aspect-[3/4] flex flex-col items-center justify-center hover:border-violet-500/50 transition-colors bg-gray-800/30">
+                        <div className="text-3xl mb-2">📷</div>
+                        <p className="text-gray-500 text-xs text-center px-2">Click to upload front</p>
+                      </div>
+                      <input type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
+                    </label>
+                  )}
                 </div>
-              ) : (
-                // Upload area - shown when no image selected
-                <label className="cursor-pointer block">
-                  <div className="border-2 border-dashed border-gray-700 rounded-xl p-12 text-center hover:border-violet-500/50 transition-colors">
-                    <div className="text-4xl mb-3">📷</div>
-                    <p className="text-gray-400 font-medium">Click to upload an image</p>
-                    <p className="text-gray-600 text-sm mt-1">PNG, JPG up to 5MB</p>
-                  </div>
-                  {/* Hidden file input - clicking the label triggers this */}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageChange}
-                    className="hidden"
-                  />
-                </label>
-              )}
+
+                {/* Back */}
+                <div>
+                  <p className="text-xs text-gray-500 mb-2 font-medium">BACK</p>
+                  {backImagePreview ? (
+                    <div className="relative aspect-[3/4]">
+                      <img src={backImagePreview} alt="Back" className="w-full h-full object-contain bg-gray-800 rounded-xl" />
+                      {backImageUploading && (
+                        <div className="absolute inset-0 bg-black/50 rounded-xl flex items-center justify-center">
+                          <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                          </svg>
+                        </div>
+                      )}
+                      {!backImageUploading && (
+                        <button type="button" onClick={() => { setBackImagePreview(null); handleChange('backImageUrl', ''); }}
+                          className="absolute top-2 right-2 bg-red-600 hover:bg-red-500 text-white w-7 h-7 rounded-full flex items-center justify-center text-xs transition-all">
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <label className="cursor-pointer block">
+                      <div className="border-2 border-dashed border-gray-700 rounded-xl aspect-[3/4] flex flex-col items-center justify-center hover:border-violet-500/50 transition-colors bg-gray-800/30">
+                        <div className="text-3xl mb-2">📷</div>
+                        <p className="text-gray-500 text-xs text-center px-2">Click to upload back</p>
+                      </div>
+                      <input type="file" accept="image/*" onChange={handleBackImageChange} className="hidden" />
+                    </label>
+                  )}
+                </div>
+
+              </div>
             </div>
 
             {/* Next button */}
             <button
               type="button"
               onClick={handleNextStep}
-              className="w-full bg-violet-600 hover:bg-violet-500 text-white py-3 rounded-xl font-bold transition-all hover:scale-[1.02]"
+              disabled={imageUploading || backImageUploading}
+              className="w-full bg-violet-600 hover:bg-violet-500 disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 rounded-xl font-bold transition-all hover:scale-[1.02]"
             >
-              Continue to Pricing →
+              {(imageUploading || backImageUploading) ? 'Uploading image...' : 'Continue to Pricing →'}
             </button>
           </div>
         )}
@@ -480,6 +625,29 @@ function ListCardPage() {
               </p>
             </div>
 
+            {/* Reserve Price */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Reserve Price
+                <span className="text-gray-600 font-normal ml-2">(optional)</span>
+              </label>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">$</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formData.reservePrice}
+                  onChange={(e) => handleChange('reservePrice', e.target.value)}
+                  placeholder="0.00"
+                  className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl pl-8 pr-4 py-3 text-sm placeholder-gray-600 focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-all"
+                />
+              </div>
+              <p className="text-gray-600 text-xs mt-2">
+                Minimum price you'll accept. If the highest bid doesn't reach this, no sale occurs and the card is re-queued.
+              </p>
+            </div>
+
             {/* Buyout Price */}
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -508,8 +676,8 @@ function ListCardPage() {
                 Auction Duration
               </label>
               <select
-                value={formData.auctionDurationSeconds}
-                onChange={(e) => handleChange('auctionDurationSeconds', e.target.value)}
+                value={['30','45','60','90','120'].includes(formData.auctionDurationSeconds) ? formData.auctionDurationSeconds : 'custom'}
+                onChange={(e) => handleChange('auctionDurationSeconds', e.target.value === 'custom' ? '' : e.target.value)}
                 className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-all"
               >
                 <option value="30">30 seconds</option>
@@ -517,7 +685,19 @@ function ListCardPage() {
                 <option value="60">60 seconds (default)</option>
                 <option value="90">90 seconds</option>
                 <option value="120">2 minutes</option>
+                <option value="custom">Custom...</option>
               </select>
+              {!['30','45','60','90','120'].includes(formData.auctionDurationSeconds) && (
+                <input
+                  type="number"
+                  min="10"
+                  max="600"
+                  value={formData.auctionDurationSeconds}
+                  onChange={(e) => handleChange('auctionDurationSeconds', e.target.value)}
+                  placeholder="Enter duration in seconds (e.g. 75)"
+                  className="mt-2 w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm placeholder-gray-600 focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-all"
+                />
+              )}
             </div>
 
             {/* Pricing tips */}

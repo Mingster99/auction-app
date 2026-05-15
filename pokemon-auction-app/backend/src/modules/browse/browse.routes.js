@@ -35,7 +35,7 @@ router.get('/cards', async (req, res, next) => {
     const conditions = [
       'u.is_verified_seller = true',
       'c.starting_bid > 0',
-      "c.status != 'ended'",
+      "c.auction_status NOT IN ('ended', 'sold')",
     ];
     const values = [];
     let paramIndex = 1;
@@ -129,7 +129,7 @@ router.get('/games', async (req, res, next) => {
       JOIN users u ON c.seller_id = u.id
       WHERE u.is_verified_seller = true
         AND c.starting_bid > 0
-        AND c.status != 'ended'
+        AND c.auction_status NOT IN ('ended', 'sold')
         AND c.tcg_game IS NOT NULL
         AND c.tcg_game != ''
       ORDER BY c.tcg_game
@@ -152,7 +152,7 @@ router.get('/grades', async (req, res, next) => {
       JOIN users u ON c.seller_id = u.id
       WHERE u.is_verified_seller = true
         AND c.starting_bid > 0
-        AND c.status != 'ended'
+        AND c.auction_status NOT IN ('ended', 'sold')
         AND c.psa_grade IS NOT NULL
         AND c.psa_grade != ''
       ORDER BY c.psa_grade DESC
@@ -191,7 +191,7 @@ router.get('/seller/:username', async (req, res, next) => {
     // Get seller's listed cards
     const cardsResult = await pool.query(
       `SELECT * FROM cards
-       WHERE seller_id = $1 AND starting_bid > 0 AND status != 'ended'
+       WHERE seller_id = $1 AND starting_bid > 0 AND auction_status NOT IN ('ended', 'sold')
        ORDER BY queued_for_stream DESC, created_at DESC`,
       [seller.id]
     );
@@ -202,7 +202,7 @@ router.get('/seller/:username', async (req, res, next) => {
          COUNT(*) as total_cards,
          COUNT(*) FILTER (WHERE queued_for_stream = true) as queued_cards
        FROM cards
-       WHERE seller_id = $1 AND starting_bid > 0 AND status != 'ended'`,
+       WHERE seller_id = $1 AND starting_bid > 0 AND auction_status NOT IN ('ended', 'sold')`,
       [seller.id]
     );
 

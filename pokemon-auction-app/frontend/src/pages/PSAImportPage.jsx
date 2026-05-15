@@ -7,9 +7,9 @@ import api from '../services/api';
 const GAME_OPTIONS = [
   { value: 'pokemon',   label: 'Pokémon' },
   { value: 'onepiece',  label: 'One Piece' },
+  { value: 'dbs',       label: 'Dragon Ball Super' },
   { value: 'yugioh',    label: 'Yu-Gi-Oh!' },
   { value: 'mtg',       label: 'Magic: The Gathering' },
-  { value: 'dbs',       label: 'Dragon Ball Super' },
   { value: 'digimon',   label: 'Digimon' },
   { value: 'cardfight',  label: 'Cardfight!! Vanguard' },
   { value: 'weiss',     label: 'Weiss Schwarz' },
@@ -29,6 +29,7 @@ function PSAImportPage() {
   const [psaData, setPsaData] = useState(null);
   const [importedCard, setImportedCard] = useState(null);
   const [startingBid, setStartingBid] = useState('');
+  const [reservePrice, setReservePrice] = useState('');
   const [buyoutPrice, setBuyoutPrice] = useState('');
   const [auctionDuration, setAuctionDuration] = useState('60');
   const [selectedGame, setSelectedGame] = useState('');
@@ -142,6 +143,22 @@ function PSAImportPage() {
       setError('Please select a card game');
       return;
     }
+    if (reservePrice && startingBid) {
+      if (parseFloat(reservePrice) <= parseFloat(startingBid)) {
+        setError('Reserve price must be greater than the starting bid');
+        return;
+      }
+      if (buyoutPrice && parseFloat(reservePrice) >= parseFloat(buyoutPrice)) {
+        setError('Reserve price must be less than the buyout price');
+        return;
+      }
+    }
+    if (buyoutPrice && startingBid) {
+      if (parseFloat(buyoutPrice) <= parseFloat(startingBid)) {
+        setError('Buyout price must be greater than the starting bid');
+        return;
+      }
+    }
 
     setLoading(true);
     setError('');
@@ -150,6 +167,7 @@ function PSAImportPage() {
       const response = await api.post('/cards/psa-import', {
         certNumber: psaData.certNumber,
         startingBid: parseFloat(startingBid) || 0,
+        reservePrice: reservePrice ? parseFloat(reservePrice) : null,
         buyoutPrice: buyoutPrice ? parseFloat(buyoutPrice) : null,
         auctionDurationSeconds: parseInt(auctionDuration) || 60,
         tcgGame: selectedGame,
@@ -389,6 +407,24 @@ function PSAImportPage() {
               </div>
             </div>
 
+            {/* Reserve Price */}
+            <div>
+              <label className="block text-sm text-gray-400 mb-2">Reserve Price (optional — minimum to sell)</label>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                <input
+                  type="number"
+                  value={reservePrice}
+                  onChange={(e) => setReservePrice(e.target.value)}
+                  placeholder="0.00"
+                  className="w-full bg-gray-900 border border-gray-700 rounded-xl pl-8 pr-4 py-3 text-white focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 outline-none"
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+              <p className="text-xs text-gray-600 mt-1">If bids don't reach this, no sale occurs and the card is re-queued.</p>
+            </div>
+
             {/* Buyout Price */}
             <div>
               <label className="block text-sm text-gray-400 mb-2">Buyout Price (optional — instant buy)</label>
@@ -410,8 +446,8 @@ function PSAImportPage() {
             <div>
               <label className="block text-sm text-gray-400 mb-2">Auction Duration</label>
               <select
-                value={auctionDuration}
-                onChange={(e) => setAuctionDuration(e.target.value)}
+                value={['30','45','60','90','120'].includes(auctionDuration) ? auctionDuration : 'custom'}
+                onChange={(e) => setAuctionDuration(e.target.value === 'custom' ? '' : e.target.value)}
                 className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 outline-none"
               >
                 <option value="30">30 seconds</option>
@@ -419,7 +455,19 @@ function PSAImportPage() {
                 <option value="60">60 seconds (default)</option>
                 <option value="90">90 seconds</option>
                 <option value="120">2 minutes</option>
+                <option value="custom">Custom...</option>
               </select>
+              {!['30','45','60','90','120'].includes(auctionDuration) && (
+                <input
+                  type="number"
+                  min="10"
+                  max="600"
+                  value={auctionDuration}
+                  onChange={(e) => setAuctionDuration(e.target.value)}
+                  placeholder="Enter duration in seconds (e.g. 75)"
+                  className="mt-2 w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 outline-none"
+                />
+              )}
             </div>
 
             {/* Actions */}
@@ -517,6 +565,7 @@ function PSAImportPage() {
                   setPsaData(null);
                   setImportedCard(null);
                   setStartingBid('');
+                  setReservePrice('');
                   setSelectedGame('');
                   setFrontPreview(null);
                   setBackPreview(null);

@@ -67,6 +67,64 @@ router.patch('/:id/price', authMiddleware, async (req, res, next) => {
 });
 
 
+// ── UPDATE AUCTION SETTINGS ──────────────────────────────
+router.patch('/:id/auction-settings', authMiddleware, async (req, res, next) => {
+  try {
+    const { startingBid, reservePrice, buyoutPrice, auctionDurationSeconds } = req.body;
+    const cardId = req.params.id;
+
+    if (startingBid === undefined || startingBid === null) {
+      return res.status(400).json({ message: 'Starting bid is required' });
+    }
+    const bid = parseFloat(startingBid);
+    if (isNaN(bid) || bid < 0) {
+      return res.status(400).json({ message: 'Starting bid must be a valid non-negative number' });
+    }
+
+    const reserve = reservePrice != null && reservePrice !== '' ? parseFloat(reservePrice) : null;
+    if (reserve !== null && (isNaN(reserve) || reserve < 0)) {
+      return res.status(400).json({ message: 'Reserve price must be a valid non-negative number' });
+    }
+
+    const buyout = buyoutPrice != null && buyoutPrice !== '' ? parseFloat(buyoutPrice) : null;
+    if (buyout !== null && (isNaN(buyout) || buyout < 0)) {
+      return res.status(400).json({ message: 'Buyout price must be a valid non-negative number' });
+    }
+
+    const duration = auctionDurationSeconds != null ? parseInt(auctionDurationSeconds, 10) : 60;
+    if (isNaN(duration) || duration < 30 || duration > 86400) {
+      return res.status(400).json({ message: 'Auction duration must be between 30 and 86400 seconds' });
+    }
+
+    const card = await pool.query(
+      'SELECT id, auction_status FROM cards WHERE id = $1 AND seller_id = $2',
+      [cardId, req.user.id]
+    );
+
+    if (card.rows.length === 0) {
+      return res.status(404).json({ message: 'Card not found or not yours' });
+    }
+
+    if (card.rows[0].auction_status === 'active') {
+      return res.status(409).json({ message: 'Cannot edit a card while it is being auctioned' });
+    }
+
+    const result = await pool.query(
+      `UPDATE cards
+       SET starting_bid = $1, reserve_price = $2, buyout_price = $3,
+           auction_duration_seconds = $4, updated_at = NOW()
+       WHERE id = $5 AND seller_id = $6
+       RETURNING *`,
+      [bid, reserve, buyout, duration, cardId, req.user.id]
+    );
+
+    res.json({ message: 'Auction settings updated', card: result.rows[0] });
+  } catch (error) {
+    next(error);
+  }
+});
+
+
 // ── TOGGLE STREAM QUEUE ──────────────────────────────────
 router.patch('/:id/queue', authMiddleware, async (req, res, next) => {
   try {
