@@ -1,7 +1,7 @@
 require('dotenv').config();
 const http = require('http');
 const app = require('./app');
-const { initializeWebSocket } = require('./websocket/socketHandler');
+const { initializeWebSocket, loadModerationState } = require('./websocket/socketHandler');
 const pool = require('./config/database');
 const { recoverActiveAuctions } = require('./services/auctionService');
 
@@ -22,6 +22,7 @@ pool.query('SELECT NOW()', async (err, res) => {
     console.log('✅ Database connected successfully');
     // Recover any active auctions that were running when server last shut down
     await recoverActiveAuctions();
+    await loadModerationState();
   }
 });
 

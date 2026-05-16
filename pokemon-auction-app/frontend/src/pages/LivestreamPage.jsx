@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useLiveKit } from '../hooks/useLiveKit';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { streamService } from '../services/streamService';
+import { ChatPanel } from '../components/chat/ChatPanel';
 
 const QUICK_BID_DELTAS = [1, 5, 10];
 
@@ -29,11 +30,15 @@ function StreamViewer() {
     auctionState,
     currentBid,
     auctionError,
+    chatError,
+    moderationStatus,
+    messages,
     placeBid,
     buyout,
     joinAuction,
     leaveAuction,
     clearAuctionError,
+    sendMessage,
   } = useWebSocket(streamId);
 
   const [stream, setStream] = useState(null);
@@ -470,6 +475,17 @@ function StreamViewer() {
             {(error || livekitError) && (
               <p className="text-red-400 mt-3">{error || livekitError}</p>
             )}
+
+            {/* Chat — lives below video so it's always visible during auctions */}
+            <ChatPanel
+              messages={messages}
+              currentUserId={user?.id}
+              chatError={chatError}
+              moderationStatus={moderationStatus}
+              connected={wsConnected}
+              onSendMessage={sendMessage}
+              isHost={false}
+            />
           </div>
 
           {/* Sidebar — Auction + Queue */}
@@ -737,6 +753,7 @@ function StreamViewer() {
                 </div>
               </div>
             )}
+
           </div>
         </div>
       </div>

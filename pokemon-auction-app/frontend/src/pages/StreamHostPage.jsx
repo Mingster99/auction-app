@@ -5,6 +5,7 @@ import { useLiveKit } from '../hooks/useLiveKit';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { streamService } from '../services/streamService';
 import api from '../services/api';
+import { ChatPanel } from '../components/chat/ChatPanel';
 import {
   DndContext,
   closestCenter,
@@ -303,8 +304,15 @@ function StreamHost() {
     auctionState,
     currentBid,
     auctionError,
+    chatError,
+    moderationStatus,
+    messages,
     joinAuction,
     leaveAuction,
+    sendMessage,
+    banUser,
+    unbanUser,
+    silenceUser,
   } = useWebSocket(streamId);
 
   const [timeRemaining, setTimeRemaining] = useState(null);
@@ -715,6 +723,21 @@ function StreamHost() {
                   </code>
                 </p>
               </div>
+
+              {/* Chat — below video so it's always visible regardless of sidebar length */}
+              <ChatPanel
+                streamId={streamId}
+                messages={messages}
+                currentUserId={user?.id}
+                chatError={chatError}
+                moderationStatus={moderationStatus}
+                connected={wsConnected}
+                onSendMessage={sendMessage}
+                onBanUser={banUser}
+                onUnbanUser={unbanUser}
+                onSilenceUser={silenceUser}
+                isHost
+              />
             </div>
 
             {/* Right: Auction + Queue */}
@@ -919,6 +942,7 @@ function StreamHost() {
                   </DndContext>
                 )}
               </div>
+
             </div>
           </div>
         )}

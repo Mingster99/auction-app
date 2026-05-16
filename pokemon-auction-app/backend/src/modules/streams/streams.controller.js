@@ -470,6 +470,60 @@ const streamsController = {
     }
   },
 
+  // ── CHAT BAN LIST (host only) ──────────────────────────
+  // GET /api/streams/:id/bans
+  getStreamBans: async (req, res, next) => {
+    try {
+      const { id: streamId } = req.params;
+
+      const { rows: stream } = await pool.query(
+        'SELECT host_id FROM streams WHERE id = $1',
+        [streamId]
+      );
+      if (!stream[0] || stream[0].host_id !== req.user.id) {
+        return res.status(403).json({ message: 'Only the stream host can view the ban list.' });
+      }
+
+      const { rows } = await pool.query(
+        `SELECT scb.user_id AS "userId", u.username
+         FROM stream_chat_bans scb
+         JOIN users u ON u.id = scb.user_id
+         WHERE scb.stream_id = $1
+         ORDER BY scb.banned_at DESC`,
+        [streamId]
+      );
+
+      res.json(rows);
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  // ── CHAT HISTORY ───────────────────────────────────────
+  // GET /api/streams/:id/chat?limit=50
+  getChatHistory: async (req, res, next) => {
+    try {
+      const { id: streamId } = req.params;
+      const limit = Math.min(parseInt(req.query.limit) || 50, 100);
+
+      const { rows } = await pool.query(
+        `SELECT cm.id, cm.message, cm.created_at,
+                u.id AS user_id, u.username
+         FROM chat_messages cm
+         JOIN users u ON u.id = cm.user_id
+         WHERE cm.stream_id = $1
+         ORDER BY cm.created_at DESC
+         LIMIT $2`,
+        [streamId, limit]
+      );
+
+      // Return in ascending order (oldest first)
+      res.json(rows.reverse());
+    } catch (error) {
+      next(error);
+    }
+  },
+
   // ── CHECK NOTIFICATION STATUS ──────────────────────────
   // GET /api/streams/:id/notify-status
   getNotificationStatus: async (req, res, next) => {

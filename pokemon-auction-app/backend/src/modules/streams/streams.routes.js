@@ -19,6 +19,12 @@ router.post('/:id/go-live', authMiddleware, streamsController.goLive);
 router.post('/:id/notify-me', authMiddleware, streamsController.toggleNotification);
 router.get('/:id/notify-status', authMiddleware, streamsController.getNotificationStatus);
 
+// Chat history (public — viewers can load history on join)
+router.get('/:id/chat', streamsController.getChatHistory);
+
+// Chat ban list (host only)
+router.get('/:id/bans', authMiddleware, streamsController.getStreamBans);
+
 // This must be last (catches /:id pattern)
 router.get('/:id', streamsController.getStreamById);
 

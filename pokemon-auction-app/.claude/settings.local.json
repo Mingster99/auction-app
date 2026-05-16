@@ -23,7 +23,8 @@
       "Bash(node -c src/modules/auth/auth.service.js)",
       "Bash(PGPASSWORD=password psql *)",
       "Read(//c/Program Files/PostgreSQL//**)",
-      "Read(//c/Program Files \\(x86\\)/**)"
+      "Read(//c/Program Files \\(x86\\)/**)",
+      "Bash(psql *)"
     ]
   }
 }
