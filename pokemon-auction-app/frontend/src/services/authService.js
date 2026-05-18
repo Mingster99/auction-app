@@ -8,8 +8,8 @@ export const authService = {
   },
 
   // Register new user
-  signup: async (email, password, username) => {
-    const response = await api.post('/auth/signup', { email, password, username });
+  signup: async (email, password, username, address = {}) => {
+    const response = await api.post('/auth/signup', { email, password, username, ...address });
     return response.data;
   },
 

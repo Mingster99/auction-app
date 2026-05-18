@@ -403,6 +403,21 @@ const broadcastAuctionState = (streamId, stateData) => {
   getIO().to(`auction:${streamId}`).emit('auction-state', stateData);
 };
 
+// ── Delivery notification helpers ──────────────────────────────────────────
+// Called from admin.controller after DB commit. Emit to buyer/seller personal rooms.
+
+const notifyPickupScheduled = (sellerId, payload) => {
+  try { getIO().to(`user:${sellerId}`).emit('pickup-scheduled', payload); } catch (_) {}
+};
+
+const notifyCardPickedUp = (buyerId, payload) => {
+  try { getIO().to(`user:${buyerId}`).emit('card-picked-up', payload); } catch (_) {}
+};
+
+const notifyCardDelivered = (buyerId, payload) => {
+  try { getIO().to(`user:${buyerId}`).emit('card-delivered', payload); } catch (_) {}
+};
+
 module.exports = {
   initializeWebSocket,
   getIO,
@@ -411,5 +426,8 @@ module.exports = {
   broadcastNewBid,
   broadcastAuctionEnd,
   broadcastTimeExtension,
-  broadcastAuctionState
+  broadcastAuctionState,
+  notifyPickupScheduled,
+  notifyCardPickedUp,
+  notifyCardDelivered,
 };

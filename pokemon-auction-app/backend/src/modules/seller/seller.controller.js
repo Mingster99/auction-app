@@ -17,7 +17,7 @@ exports.getOverview = async (req, res, next) => {
       pool.query(
         `SELECT COALESCE(SUM(seller_payout_amount), 0) AS total
          FROM invoices
-         WHERE seller_id = $1 AND status IN ('pending', 'processing')`,
+         WHERE seller_id = $1 AND status IN ('pending', 'paid', 'pickup_scheduled')`,
         [sellerId]
       ),
       pool.query(
@@ -115,13 +115,13 @@ exports.getInvoices = async (req, res, next) => {
     const [list, count, pending] = await Promise.all([
       pool.query(
         `SELECT i.id, i.amount, i.platform_fee_amount, i.seller_payout_amount,
-                i.status, i.created_at, i.paid_at,
-                i.tracking_number, i.tracking_carrier,
-                i.shipped_at, i.released_at, i.review_notes,
+                i.status, i.created_at,
+                i.pickup_scheduled_at, i.pickup_note,
+                i.picked_up_at, i.delivered_at,
                 c.name AS card_name, c.id AS card_id,
                 u.username AS buyer_username
          FROM invoices i
-         JOIN cards c ON c.id = i.card_id
+         LEFT JOIN cards c ON c.id = i.card_id
          JOIN users u ON u.id = i.buyer_id
          WHERE ${where}
          ORDER BY i.created_at DESC
@@ -135,7 +135,7 @@ exports.getInvoices = async (req, res, next) => {
       pool.query(
         `SELECT COALESCE(SUM(seller_payout_amount), 0) AS total
          FROM invoices
-         WHERE seller_id = $1 AND status IN ('pending', 'processing')`,
+         WHERE seller_id = $1 AND status IN ('pending', 'paid', 'pickup_scheduled')`,
         [sellerId]
       ),
     ]);

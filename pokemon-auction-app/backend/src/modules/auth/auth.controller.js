@@ -4,14 +4,20 @@ const authController = {
   // Register new user
   signup: async (req, res, next) => {
     try {
-      const { email, password, username } = req.body;
+      const { email, password, username, address_line1, address_line2, city, state, postal_code, country, phone } = req.body;
 
-      // Validation
       if (!email || !password || !username) {
         return res.status(400).json({ message: 'All fields are required' });
       }
 
-      const result = await authService.signup(email, password, username);
+      if (!address_line1 || !city || !postal_code || !country) {
+        return res.status(400).json({ message: 'Address (line 1, city, postal code, country) is required' });
+      }
+
+      const result = await authService.signup(email, password, username, {
+        address_line1, address_line2: address_line2 || null, city, state: state || null, postal_code, country,
+        phone: phone || null,
+      });
       res.status(201).json(result);
     } catch (error) {
       next(error);

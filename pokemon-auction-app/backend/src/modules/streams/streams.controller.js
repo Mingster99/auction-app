@@ -14,14 +14,37 @@ const streamsController = {
   // on the home page and in the navbar's "rejoin" check.
   getActiveStreams: async (req, res, next) => {
     try {
-      const result = await pool.query(
-        `SELECT s.*, u.username as host_name
+      const { rows: streams } = await pool.query(
+        `SELECT s.*, u.username as host_name,
+                (SELECT COUNT(*) FROM cards c WHERE c.stream_id = s.id AND c.auction_status = 'sold') AS cards_sold
          FROM streams s
          JOIN users u ON s.host_id = u.id
          WHERE s.status = 'live'
          ORDER BY s.started_at DESC`
       );
-      res.json(result.rows);
+
+      // Attach the currently active card and a few preview cards per stream
+      for (const stream of streams) {
+        const { rows: active } = await pool.query(
+          `SELECT id, name, card_image_front, image_url, psa_grade, current_bid, starting_bid
+           FROM cards
+           WHERE stream_id = $1 AND auction_status = 'active'
+           LIMIT 1`,
+          [stream.id]
+        );
+        const { rows: preview } = await pool.query(
+          `SELECT id, name, card_image_front, image_url, psa_grade, starting_bid
+           FROM cards
+           WHERE stream_id = $1 AND queued_for_stream = true AND auction_status = 'idle'
+           ORDER BY queue_order ASC NULLS LAST
+           LIMIT 3`,
+          [stream.id]
+        );
+        stream.active_card  = active[0]  || null;
+        stream.preview_cards = preview;
+      }
+
+      res.json(streams);
     } catch (error) {
       next(error);
     }
@@ -268,15 +291,6 @@ const streamsController = {
       const startTime = new Date(scheduled_start_time);
       if (startTime <= new Date()) {
         return res.status(400).json({ message: 'Scheduled time must be in the future' });
-      }
-
-      // Verify seller
-      const { rows: userRows } = await pool.query(
-        'SELECT is_verified_seller FROM users WHERE id = $1',
-        [hostId]
-      );
-      if (!userRows[0]?.is_verified_seller) {
-        return res.status(403).json({ message: 'Only verified sellers can schedule streams' });
       }
 
       const channelName = `stream_${hostId}_${Date.now()}`;

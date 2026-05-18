@@ -2,12 +2,24 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
+const COUNTRIES = [
+  'Singapore', 'Malaysia', 'Indonesia', 'Thailand', 'Philippines',
+  'Vietnam', 'Australia', 'United States', 'United Kingdom', 'Other',
+];
+
 function SignupPage() {
   const [formData, setFormData] = useState({
     username: '',
     email: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    address_line1: '',
+    address_line2: '',
+    city: '',
+    state: '',
+    postal_code: '',
+    country: 'Singapore',
+    phone: '',
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -35,10 +47,16 @@ function SignupPage() {
       return;
     }
 
+    if (!formData.address_line1 || !formData.city || !formData.postal_code || !formData.country) {
+      setError('Address, city, postal code, and country are required');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      await signup(formData.email, formData.password, formData.username);
+      const { username, email, password, address_line1, address_line2, city, state, postal_code, country, phone } = formData;
+      await signup(email, password, username, { address_line1, address_line2, city, state, postal_code, country, phone: phone || null });
       navigate('/');
     } catch (err) {
       setError(err.response?.data?.message || 'Signup failed. Please try again.');
@@ -46,6 +64,9 @@ function SignupPage() {
       setLoading(false);
     }
   };
+
+  const inputCls = 'w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm placeholder-gray-600 focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-all disabled:opacity-50';
+  const labelCls = 'block text-sm font-medium text-gray-300 mb-2';
 
   return (
     <div className="min-h-screen bg-gray-950 flex items-center justify-center px-4 py-16">
@@ -78,97 +99,111 @@ function SignupPage() {
 
           <form onSubmit={handleSubmit} className="space-y-5">
 
+            {/* Account fields */}
             <div>
-              <label htmlFor="username" className="block text-sm font-medium text-gray-300 mb-2">
-                Username
-              </label>
-              <input
-                id="username"
-                name="username"
-                type="text"
-                required
-                disabled={loading}
-                value={formData.username}
-                onChange={handleChange}
-                placeholder="cooltrainer99"
-                className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm placeholder-gray-600 focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-all disabled:opacity-50"
-              />
+              <label htmlFor="username" className={labelCls}>Username</label>
+              <input id="username" name="username" type="text" required disabled={loading}
+                value={formData.username} onChange={handleChange}
+                placeholder="cooltrainer99" className={inputCls} />
             </div>
 
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
-                Email address
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                required
-                disabled={loading}
-                value={formData.email}
-                onChange={handleChange}
-                placeholder="you@example.com"
-                className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm placeholder-gray-600 focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-all disabled:opacity-50"
-              />
+              <label htmlFor="email" className={labelCls}>Email address</label>
+              <input id="email" name="email" type="email" required disabled={loading}
+                value={formData.email} onChange={handleChange}
+                placeholder="you@example.com" className={inputCls} />
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-2">
-                Password
-              </label>
+              <label htmlFor="password" className={labelCls}>Password</label>
               <div className="relative">
-                <input
-                  id="password"
-                  name="password"
-                  type={showPassword ? 'text' : 'password'}
-                  required
-                  disabled={loading}
-                  value={formData.password}
-                  onChange={handleChange}
-                  placeholder="••••••••"
-                  className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 pr-12 text-sm placeholder-gray-600 focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-all disabled:opacity-50"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors"
-                >
+                <input id="password" name="password" type={showPassword ? 'text' : 'password'}
+                  required disabled={loading} value={formData.password} onChange={handleChange}
+                  placeholder="••••••••" className={`${inputCls} pr-12`} />
+                <button type="button" onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors">
                   {showPassword ? '🙈' : '👁️'}
                 </button>
               </div>
             </div>
 
             <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-300 mb-2">
-                Confirm password
-              </label>
+              <label htmlFor="confirmPassword" className={labelCls}>Confirm password</label>
               <div className="relative">
-                <input
-                  id="confirmPassword"
-                  name="confirmPassword"
-                  type={showConfirmPassword ? 'text' : 'password'}
-                  required
-                  disabled={loading}
-                  value={formData.confirmPassword}
-                  onChange={handleChange}
-                  placeholder="••••••••"
-                  className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 pr-12 text-sm placeholder-gray-600 focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-all disabled:opacity-50"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors"
-                >
+                <input id="confirmPassword" name="confirmPassword" type={showConfirmPassword ? 'text' : 'password'}
+                  required disabled={loading} value={formData.confirmPassword} onChange={handleChange}
+                  placeholder="••••••••" className={`${inputCls} pr-12`} />
+                <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors">
                   {showConfirmPassword ? '🙈' : '👁️'}
                 </button>
               </div>
             </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-violet-600 hover:bg-violet-500 disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 rounded-xl font-bold text-sm transition-all hover:scale-[1.02] hover:shadow-lg hover:shadow-violet-500/25 mt-2"
-            >
+            {/* Address section */}
+            <div className="pt-2">
+              <p className="text-xs text-gray-500 uppercase tracking-wide font-medium mb-4">
+                Delivery / Pickup Address
+              </p>
+
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="address_line1" className={labelCls}>Address Line 1 *</label>
+                  <input id="address_line1" name="address_line1" type="text" required disabled={loading}
+                    value={formData.address_line1} onChange={handleChange}
+                    placeholder="123 Orchard Road" className={inputCls} />
+                </div>
+
+                <div>
+                  <label htmlFor="address_line2" className={labelCls}>Address Line 2 / Unit (optional)</label>
+                  <input id="address_line2" name="address_line2" type="text" disabled={loading}
+                    value={formData.address_line2} onChange={handleChange}
+                    placeholder="#05-01" className={inputCls} />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label htmlFor="city" className={labelCls}>City *</label>
+                    <input id="city" name="city" type="text" required disabled={loading}
+                      value={formData.city} onChange={handleChange}
+                      placeholder="Singapore" className={inputCls} />
+                  </div>
+                  <div>
+                    <label htmlFor="postal_code" className={labelCls}>Postal Code *</label>
+                    <input id="postal_code" name="postal_code" type="text" required disabled={loading}
+                      value={formData.postal_code} onChange={handleChange}
+                      placeholder="238801" className={inputCls} />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label htmlFor="state" className={labelCls}>State / Region (optional)</label>
+                    <input id="state" name="state" type="text" disabled={loading}
+                      value={formData.state} onChange={handleChange}
+                      placeholder="—" className={inputCls} />
+                  </div>
+                  <div>
+                    <label htmlFor="country" className={labelCls}>Country *</label>
+                    <select id="country" name="country" required disabled={loading}
+                      value={formData.country} onChange={handleChange}
+                      className={inputCls}>
+                      {COUNTRIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="phone" className={labelCls}>Phone number (optional)</label>
+                  <input id="phone" name="phone" type="tel" disabled={loading}
+                    value={formData.phone} onChange={handleChange}
+                    placeholder="+65 9123 4567" className={inputCls} />
+                </div>
+              </div>
+            </div>
+
+            <button type="submit" disabled={loading}
+              className="w-full bg-violet-600 hover:bg-violet-500 disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 rounded-xl font-bold text-sm transition-all hover:scale-[1.02] hover:shadow-lg hover:shadow-violet-500/25 mt-2">
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
                   <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">

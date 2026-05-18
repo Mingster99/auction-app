@@ -189,18 +189,20 @@ function Navbar() {
                   )}
                 </div>
 
-                {/* Go live / Rejoin stream button */}
-                <Link
-                  to="/stream/host"
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all border ${
-                    hasActiveStream
-                      ? 'bg-violet-600/20 hover:bg-violet-600/30 border-violet-500/30 text-violet-400'
-                      : 'bg-red-600/20 hover:bg-red-600/30 border-red-500/30 text-red-400'
-                  }`}
-                >
-                  <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${hasActiveStream ? 'bg-violet-400' : 'bg-red-500'}`} />
-                  {hasActiveStream ? 'Rejoin Stream' : 'Go Live'}
-                </Link>
+                {/* Go live / Rejoin stream — verified sellers only */}
+                {user?.is_verified_seller && (
+                  <Link
+                    to="/stream/host"
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all border ${
+                      hasActiveStream
+                        ? 'bg-violet-600/20 hover:bg-violet-600/30 border-violet-500/30 text-violet-400'
+                        : 'bg-red-600/20 hover:bg-red-600/30 border-red-500/30 text-red-400'
+                    }`}
+                  >
+                    <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${hasActiveStream ? 'bg-violet-400' : 'bg-red-500'}`} />
+                    {hasActiveStream ? 'Rejoin Stream' : 'Go Live'}
+                  </Link>
+                )}
 
                 {/* User dropdown */}
                 <div className="relative group">
@@ -242,12 +244,6 @@ function Navbar() {
                         className="block px-4 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
                       >
                         📄 My Invoices
-                      </Link>
-                      <Link
-                        to="/my-bids"
-                        className="block px-4 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
-                      >
-                        💰 My Bids
                       </Link>
                       {user?.is_admin && (
                         <Link
@@ -334,17 +330,19 @@ function Navbar() {
                 >
                   Scan PSA
                 </Link>
-                <Link
-                  to="/stream/host"
-                  onClick={() => setMobileOpen(false)}
-                  className={`block px-4 py-3 rounded-xl transition-colors font-medium ${
-                    hasActiveStream
-                      ? 'text-violet-400 hover:bg-gray-800'
-                      : 'text-red-400 hover:bg-gray-800'
-                  }`}
-                >
-                  {hasActiveStream ? '↩ Rejoin Stream' : '🔴 Go Live'}
-                </Link>
+                {user?.is_verified_seller && (
+                  <Link
+                    to="/stream/host"
+                    onClick={() => setMobileOpen(false)}
+                    className={`block px-4 py-3 rounded-xl transition-colors font-medium ${
+                      hasActiveStream
+                        ? 'text-violet-400 hover:bg-gray-800'
+                        : 'text-red-400 hover:bg-gray-800'
+                    }`}
+                  >
+                    {hasActiveStream ? '↩ Rejoin Stream' : '🔴 Go Live'}
+                  </Link>
+                )}
                 <button
                   onClick={() => {
                     setMobileOpen(false);

@@ -8,32 +8,63 @@ const PAGE_SIZE = 25;
 const fmtMoney = (v) => `$${parseFloat(v || 0).toFixed(2)}`;
 
 const STATUS_BADGE = {
-  pending: 'bg-amber-500/20 text-amber-400',
-  awaiting_review: 'bg-blue-500/20 text-blue-400',
-  processing: 'bg-blue-500/20 text-blue-400',
-  paid: 'bg-green-500/20 text-green-400',
-  shipped: 'bg-green-500/20 text-green-400',
-  failed: 'bg-red-500/20 text-red-400',
-  refunded: 'bg-gray-500/20 text-gray-400',
+  pending:          'bg-amber-500/20 text-amber-400',
+  paid:             'bg-blue-500/20 text-blue-400',
+  pickup_scheduled: 'bg-violet-500/20 text-violet-400',
+  picked_up:        'bg-orange-500/20 text-orange-400',
+  delivered:        'bg-green-500/20 text-green-400',
+  failed:           'bg-red-500/20 text-red-400',
+  refunded:         'bg-gray-500/20 text-gray-400',
 };
 
 const STATUS_LABEL = {
-  pending: 'Pending',
-  awaiting_review: 'In review',
-  shipped: 'Shipped',
-  paid: 'Paid',
-  processing: 'Processing',
-  failed: 'Failed',
-  refunded: 'Refunded',
+  pending:          'Awaiting Payment',
+  paid:             'Paid',
+  pickup_scheduled: 'Pickup Scheduled',
+  picked_up:        'On Its Way',
+  delivered:        'Delivered',
+  failed:           'Failed',
+  refunded:         'Refunded',
 };
 
 const STATUS_OPTIONS = [
-  { value: 'all', label: 'All statuses' },
-  { value: 'pending', label: 'Pending' },
-  { value: 'awaiting_review', label: 'In review' },
-  { value: 'shipped', label: 'Shipped' },
-  { value: 'refunded', label: 'Refunded' },
+  { value: 'all',              label: 'All statuses' },
+  { value: 'pending',          label: 'Awaiting Payment' },
+  { value: 'pickup_scheduled', label: 'Pickup Scheduled' },
+  { value: 'picked_up',        label: 'On Its Way' },
+  { value: 'delivered',        label: 'Delivered' },
+  { value: 'refunded',         label: 'Refunded' },
 ];
+
+function DeliveryProgress({ invoice }) {
+  const { status, pickup_scheduled_at, pickup_note, picked_up_at, delivered_at } = invoice;
+
+  if (status === 'pending' || status === 'paid') {
+    return <span className="text-gray-600 text-xs">Awaiting scheduling</span>;
+  }
+  if (status === 'pickup_scheduled') {
+    return (
+      <span className="text-violet-300 text-xs" title={pickup_note}>
+        Pickup booked {pickup_scheduled_at ? new Date(pickup_scheduled_at).toLocaleDateString() : ''}
+      </span>
+    );
+  }
+  if (status === 'picked_up') {
+    return (
+      <span className="text-orange-300 text-xs">
+        Picked up {picked_up_at ? new Date(picked_up_at).toLocaleDateString() : ''}
+      </span>
+    );
+  }
+  if (status === 'delivered') {
+    return (
+      <span className="text-green-400 text-xs">
+        Delivered {delivered_at ? new Date(delivered_at).toLocaleDateString() : ''}
+      </span>
+    );
+  }
+  return <span className="text-gray-600 text-xs">—</span>;
+}
 
 export default function MyInvoicesPage() {
   const { isAuthenticated, loading: authLoading } = useAuth();
@@ -86,7 +117,7 @@ export default function MyInvoicesPage() {
     <div className="min-h-screen bg-[#0f1419] text-white">
       <div className="max-w-7xl mx-auto p-6 space-y-4">
         <div>
-          <h1 className="text-3xl font-black">My Invoices</h1>
+          <h1 className="text-3xl font-black">My Orders</h1>
           <p className="text-gray-400 text-sm mt-1">Cards you've won or bought.</p>
         </div>
 
@@ -94,33 +125,20 @@ export default function MyInvoicesPage() {
         <div className="bg-[#1a1f2e] rounded-2xl border border-gray-800 p-4 flex flex-wrap items-end gap-3">
           <div className="flex-1 min-w-[140px]">
             <label className="block text-[10px] text-gray-500 uppercase font-medium mb-1">Status</label>
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-              className="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-1.5 text-white text-sm focus:border-violet-500 outline-none"
-            >
-              {STATUS_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>{o.label}</option>
-              ))}
+            <select value={status} onChange={(e) => setStatus(e.target.value)}
+              className="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-1.5 text-white text-sm focus:border-violet-500 outline-none">
+              {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           </div>
           <div className="flex-1 min-w-[140px]">
             <label className="block text-[10px] text-gray-500 uppercase font-medium mb-1">From</label>
-            <input
-              type="date"
-              value={from}
-              onChange={(e) => setFrom(e.target.value)}
-              className="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-1.5 text-white text-sm focus:border-violet-500 outline-none"
-            />
+            <input type="date" value={from} onChange={(e) => setFrom(e.target.value)}
+              className="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-1.5 text-white text-sm focus:border-violet-500 outline-none" />
           </div>
           <div className="flex-1 min-w-[140px]">
             <label className="block text-[10px] text-gray-500 uppercase font-medium mb-1">To</label>
-            <input
-              type="date"
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-              className="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-1.5 text-white text-sm focus:border-violet-500 outline-none"
-            />
+            <input type="date" value={to} onChange={(e) => setTo(e.target.value)}
+              className="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-1.5 text-white text-sm focus:border-violet-500 outline-none" />
           </div>
         </div>
 
@@ -138,7 +156,7 @@ export default function MyInvoicesPage() {
                   <th className="px-4 py-3 font-medium">Seller</th>
                   <th className="px-4 py-3 font-medium text-right">Amount</th>
                   <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-4 py-3 font-medium">Tracking</th>
+                  <th className="px-4 py-3 font-medium">Delivery</th>
                   <th className="px-4 py-3 font-medium">Date</th>
                 </tr>
               </thead>
@@ -153,16 +171,13 @@ export default function MyInvoicesPage() {
                   ))
                 ) : data.invoices.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-12 text-center text-gray-500">No invoices match these filters.</td>
+                    <td colSpan={6} className="px-4 py-12 text-center text-gray-500">No orders match these filters.</td>
                   </tr>
                 ) : (
                   data.invoices.map((inv) => (
-                    <tr
-                      key={inv.id}
-                      onClick={() => setOpenInvoiceId(inv.id)}
-                      className="border-b border-gray-800 last:border-0 hover:bg-gray-800/30 transition-colors cursor-pointer"
-                    >
-                      <td className="px-4 py-3 text-white">{inv.card_name}</td>
+                    <tr key={inv.id} onClick={() => setOpenInvoiceId(inv.id)}
+                      className="border-b border-gray-800 last:border-0 hover:bg-gray-800/30 transition-colors cursor-pointer">
+                      <td className="px-4 py-3 text-white">{inv.card_name || '—'}</td>
                       <td className="px-4 py-3 text-gray-400">@{inv.seller_username}</td>
                       <td className="px-4 py-3 text-right text-white font-medium">{fmtMoney(inv.amount)}</td>
                       <td className="px-4 py-3">
@@ -170,12 +185,8 @@ export default function MyInvoicesPage() {
                           {STATUS_LABEL[inv.status] || inv.status}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-gray-300 text-xs">
-                        {inv.tracking_number ? (
-                          <span title={`${inv.tracking_carrier} · ${inv.tracking_number}`}>
-                            {inv.tracking_carrier} · {inv.tracking_number}
-                          </span>
-                        ) : '—'}
+                      <td className="px-4 py-3">
+                        <DeliveryProgress invoice={inv} />
                       </td>
                       <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
                         {new Date(inv.created_at).toLocaleDateString()}
@@ -189,23 +200,15 @@ export default function MyInvoicesPage() {
 
           {!loading && data.total > 0 && (
             <div className="flex items-center justify-between px-4 py-3 border-t border-gray-800 text-xs text-gray-400">
-              <span>
-                Showing {offset + 1}–{Math.min(offset + PAGE_SIZE, data.total)} of {data.total}
-              </span>
+              <span>Showing {offset + 1}–{Math.min(offset + PAGE_SIZE, data.total)} of {data.total}</span>
               <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
-                  disabled={offset === 0}
-                  className="bg-gray-800 hover:bg-gray-700 text-white px-3 py-1 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                >
+                <button onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))} disabled={offset === 0}
+                  className="bg-gray-800 hover:bg-gray-700 text-white px-3 py-1 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
                   ← Prev
                 </button>
                 <span>Page {currentPage} of {totalPages}</span>
-                <button
-                  onClick={() => setOffset(offset + PAGE_SIZE)}
-                  disabled={offset + PAGE_SIZE >= data.total}
-                  className="bg-gray-800 hover:bg-gray-700 text-white px-3 py-1 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                >
+                <button onClick={() => setOffset(offset + PAGE_SIZE)} disabled={offset + PAGE_SIZE >= data.total}
+                  className="bg-gray-800 hover:bg-gray-700 text-white px-3 py-1 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
                   Next →
                 </button>
               </div>

@@ -22,7 +22,7 @@ router.get('/', authMiddleware, async (req, res, next) => {
   try {
     const result = await pool.query(
       `SELECT * FROM cards
-       WHERE seller_id = $1
+       WHERE seller_id = $1 AND deleted_at IS NULL
        ORDER BY queued_for_stream DESC, created_at DESC`,
       [req.user.id]
     );
@@ -224,7 +224,7 @@ router.patch('/queue-order', authMiddleware, async (req, res, next) => {
     // Return updated queue
     const { rows } = await pool.query(
       `SELECT * FROM cards
-       WHERE seller_id = $1 AND queued_for_stream = true
+       WHERE seller_id = $1 AND queued_for_stream = true AND deleted_at IS NULL
        ORDER BY queue_order ASC NULLS LAST, queued_at ASC`,
       [req.user.id]
     );
@@ -241,7 +241,7 @@ router.get('/queue', authMiddleware, async (req, res, next) => {
   try {
     const result = await pool.query(
       `SELECT * FROM cards
-       WHERE seller_id = $1 AND queued_for_stream = true
+       WHERE seller_id = $1 AND queued_for_stream = true AND deleted_at IS NULL
        ORDER BY queue_order ASC NULLS LAST, queued_at ASC`,
       [req.user.id]
     );
@@ -263,7 +263,7 @@ router.get('/upcoming', async (req, res, next) => {
               c.queued_at, u.username as seller_name
        FROM cards c
        JOIN users u ON c.seller_id = u.id
-       WHERE c.queued_for_stream = true
+       WHERE c.queued_for_stream = true AND c.deleted_at IS NULL
        ORDER BY c.queued_at ASC`
     );
     res.json(result.rows);

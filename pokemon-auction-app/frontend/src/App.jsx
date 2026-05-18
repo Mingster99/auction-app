@@ -21,7 +21,9 @@ import UpcomingStreamsPage from './pages/UpcomingStreamsPage';
 import PaymentMethodPage from './pages/PaymentMethodPage';
 import DashboardPage from './pages/DashboardPage';
 import RequireVerifiedSeller from './components/common/RequireVerifiedSeller';
+import StreamsPage from './pages/StreamsPage';
 import MyInvoicesPage from './pages/MyInvoicesPage';
+import MyBidsPage from './pages/MyBidsPage';
 import AdminReviewPage from './pages/AdminReviewPage';
 import RequireAdmin from './components/common/RequireAdmin';
 
@@ -47,9 +49,8 @@ function App() {
 
                 <Route path="/seller/:username" element={<SellerProfilePage />} />
 
+                <Route path="/streams" element={<StreamsPage />} />
                 <Route path="/livestream/:id" element={<LivestreamPage />} />
-                <Route path="/stream/host" element={<StreamHostPage />} />
-
                 <Route path="/my-cards" element={<MyCardsPage />} />
 
                 <Route path="/cards" element={<BrowseCardsPage />} />
@@ -59,9 +60,11 @@ function App() {
 
                 <Route element={<RequireVerifiedSeller />}>
                   <Route path="/dashboard" element={<DashboardPage />} />
+                  <Route path="/stream/host" element={<StreamHostPage />} />
                 </Route>
 
                 <Route path="/my-invoices" element={<MyInvoicesPage />} />
+                <Route path="/my-bids" element={<MyBidsPage />} />
 
                 <Route element={<RequireAdmin />}>
                   <Route path="/admin" element={<AdminReviewPage />} />

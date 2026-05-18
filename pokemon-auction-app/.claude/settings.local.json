@@ -24,7 +24,9 @@
       "Bash(PGPASSWORD=password psql *)",
       "Read(//c/Program Files/PostgreSQL//**)",
       "Read(//c/Program Files \\(x86\\)/**)",
-      "Bash(psql *)"
+      "Bash(psql *)",
+      "Bash(npm install *)",
+      "Bash(node *)"
     ]
   }
 }

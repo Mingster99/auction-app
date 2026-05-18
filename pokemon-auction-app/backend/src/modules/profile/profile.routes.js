@@ -5,5 +5,6 @@ const profileController = require('./profile.controller');
 
 router.use(authMiddleware);
 router.get('/overview', profileController.getOverview);
+router.patch('/details', profileController.updateDetails);
 
 module.exports = router;

@@ -7,6 +7,6 @@ router.use(authMiddleware);
 
 router.get('/my', invoicesController.getMy);
 router.get('/:id', invoicesController.getOne);
-router.post('/:id/ship', invoicesController.markShipped);
+// markShipped removed — seller shipping replaced by admin pickup flow
 
 module.exports = router;

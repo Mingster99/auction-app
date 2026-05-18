@@ -4,8 +4,7 @@ const pool = require('../../config/database');
 
 const authService = {
   // Register new user
-  signup: async (email, password, username) => {
-    // Check if user already exists
+  signup: async (email, password, username, address = {}) => {
     const existingUser = await pool.query(
       'SELECT * FROM users WHERE email = $1 OR username = $2',
       [email, username]
@@ -15,19 +14,21 @@ const authService = {
       throw { status: 409, message: 'User already exists' };
     }
 
-    // Hash password
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
 
-    // Create user
+    const { address_line1, address_line2, city, state, postal_code, country, phone } = address;
+
     const result = await pool.query(
-      'INSERT INTO users (email, username, password_hash) VALUES ($1, $2, $3) RETURNING id, email, username, created_at',
-      [email, username, passwordHash]
+      `INSERT INTO users
+         (email, username, password_hash, address_line1, address_line2, city, state, postal_code, country, phone)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       RETURNING id, email, username, address_line1, address_line2, city, state, postal_code, country, phone, created_at`,
+      [email, username, passwordHash, address_line1, address_line2, city, state, postal_code, country, phone]
     );
 
     const user = result.rows[0];
 
-    // Generate JWT token
     const token = jwt.sign(
       { id: user.id, email: user.email, username: user.username },
       process.env.JWT_SECRET,

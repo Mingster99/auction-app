@@ -32,13 +32,13 @@ exports.getMy = async (req, res, next) => {
     const [list, count] = await Promise.all([
       pool.query(
         `SELECT i.id, i.amount, i.status, i.created_at,
-                i.tracking_number, i.tracking_carrier,
-                i.shipped_at, i.released_at,
+                i.pickup_scheduled_at, i.pickup_note,
+                i.picked_up_at, i.delivered_at,
                 c.id AS card_id, c.name AS card_name,
                 c.card_image_front, c.image_url, c.psa_grade,
                 u.username AS seller_username
          FROM invoices i
-         JOIN cards c ON c.id = i.card_id
+         LEFT JOIN cards c ON c.id = i.card_id
          JOIN users u ON u.id = i.seller_id
          WHERE ${where}
          ORDER BY i.created_at DESC
@@ -76,7 +76,7 @@ exports.getOne = async (req, res, next) => {
               s.username AS seller_username,
               b.username AS buyer_username
        FROM invoices i
-       JOIN cards c ON c.id = i.card_id
+       LEFT JOIN cards c ON c.id = i.card_id
        JOIN users s ON s.id = i.seller_id
        JOIN users b ON b.id = i.buyer_id
        WHERE i.id = $1`,
