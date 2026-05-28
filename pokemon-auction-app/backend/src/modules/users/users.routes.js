@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../../config/database');
 const authMiddleware = require('../../middleware/auth.middleware');
+const airwallexService = require('../../utils/airwallexService');
 
 // GET /api/users/me/notifications - recent "stream going live" notifications for the authed user
 router.get('/me/notifications', authMiddleware, async (req, res, next) => {
@@ -26,16 +27,49 @@ router.get('/me/notifications', authMiddleware, async (req, res, next) => {
   }
 });
 
-// POST /api/users/me/payment-method - stub that flips has_payment_method = true
+// POST /api/users/me/payment-method
+// Step 1: create Airwallex customer + payment consent, return clientSecret for frontend to confirm.
 router.post('/me/payment-method', authMiddleware, async (req, res, next) => {
   try {
+    const { id: userId, email } = req.user;
+
+    // Re-use existing customer if already created
     const { rows } = await pool.query(
-      `UPDATE users SET has_payment_method = true
-       WHERE id = $1
-       RETURNING id, username, email, avatar_url, rating, is_verified, is_verified_seller, has_payment_method, created_at`,
-      [req.user.id]
+      'SELECT airwallex_customer_id FROM users WHERE id = $1',
+      [userId]
     );
-    res.json({ message: 'Payment method added', user: rows[0] });
+    let customerId = rows[0]?.airwallex_customer_id;
+    if (!customerId) {
+      customerId = await airwallexService.createCustomer(userId, email);
+      await pool.query(
+        'UPDATE users SET airwallex_customer_id = $1 WHERE id = $2',
+        [customerId, userId]
+      );
+    }
+
+    const clientSecret = await airwallexService.generateCustomerClientSecret(customerId);
+    res.json({ clientSecret, customerId });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// PUT /api/users/me/payment-method
+// Step 2: frontend confirmed the consent — save the consentId and activate the payment flag.
+router.put('/me/payment-method', authMiddleware, async (req, res, next) => {
+  try {
+    const { consentId } = req.body;
+    if (!consentId) return res.status(400).json({ message: 'consentId is required' });
+
+    const { rows } = await pool.query(
+      `UPDATE users
+       SET airwallex_consent_id = $1, has_payment_method = true
+       WHERE id = $2
+       RETURNING id, username, email, avatar_url, rating, is_verified, is_verified_seller,
+                 has_payment_method, is_admin, created_at`,
+      [consentId, req.user.id]
+    );
+    res.json({ message: 'Payment method saved', user: rows[0] });
   } catch (err) {
     next(err);
   }

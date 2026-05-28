@@ -53,6 +53,7 @@ function StreamViewer() {
   const [bidHistory, setBidHistory] = useState([]);
   const [previewQueue, setPreviewQueue] = useState([]);
   const [winModal, setWinModal] = useState(null);
+  const [paymentInfo, setPaymentInfo] = useState(null); // { invoiceId, amount, state: 'charging'|'paid'|'failed'|'needs_card' }
   const [inlineError, setInlineError] = useState('');
 
   const wasLeaderRef = useRef(false);
@@ -281,8 +282,26 @@ function StreamViewer() {
           amount: data.amount,
           isBuyout: !!data.isBuyout,
         });
+        setPaymentInfo(null); // reset; will be set by payment-required
       }
       refreshPreview();
+    });
+
+    // Payment events — emitted to user:<id> personal room (same socket connection)
+    socket.on('payment-required', (data) => {
+      setPaymentInfo({
+        invoiceId: data.invoiceId,
+        amount: data.amount,
+        state: data.autoCharged ? 'charging' : 'needs_card',
+      });
+    });
+
+    socket.on('payment-succeeded', (data) => {
+      setPaymentInfo((prev) => prev ? { ...prev, state: 'paid' } : null);
+    });
+
+    socket.on('payment-failed', (data) => {
+      setPaymentInfo((prev) => prev ? { ...prev, state: 'failed' } : null);
     });
 
     socket.on('bid-error', (data) => {
@@ -304,12 +323,14 @@ function StreamViewer() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [streamId, user?.id]);
 
-  // Auto-dismiss win modal
+  // Auto-dismiss win modal only after payment is resolved
   useEffect(() => {
     if (!winModal) return;
-    const t = setTimeout(() => setWinModal(null), 5000);
+    const resolved = !paymentInfo || paymentInfo.state === 'paid';
+    if (!resolved) return;
+    const t = setTimeout(() => { setWinModal(null); setPaymentInfo(null); }, 5000);
     return () => clearTimeout(t);
-  }, [winModal]);
+  }, [winModal, paymentInfo]);
 
   const ensurePaymentMethod = () => {
     if (!user?.has_payment_method) {
@@ -828,11 +849,41 @@ function StreamViewer() {
             <p className="text-4xl font-black text-green-400 mt-2">
               ${parseFloat(winModal.amount || 0).toFixed(2)}
             </p>
-            <p className="text-gray-400 text-xs mt-4">
-              Invoice created — payment will be charged to your card on file.
-            </p>
+
+            {/* Payment state */}
+            <div className="mt-4">
+              {(!paymentInfo || paymentInfo.state === 'charging') && (
+                <div className="flex items-center justify-center gap-2 text-gray-400 text-sm">
+                  <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                  </svg>
+                  Charging your card…
+                </div>
+              )}
+              {paymentInfo?.state === 'paid' && (
+                <p className="text-green-400 text-sm font-bold">✓ Payment successful</p>
+              )}
+              {paymentInfo?.state === 'failed' && (
+                <div>
+                  <p className="text-red-400 text-sm font-medium">Payment failed</p>
+                  <a href="/my-invoices" className="text-violet-400 text-xs underline mt-1 inline-block">
+                    Retry from My Invoices →
+                  </a>
+                </div>
+              )}
+              {paymentInfo?.state === 'needs_card' && (
+                <div>
+                  <p className="text-amber-400 text-sm font-medium">No card on file</p>
+                  <a href="/settings/payment" className="text-violet-400 text-xs underline mt-1 inline-block">
+                    Add a payment method →
+                  </a>
+                </div>
+              )}
+            </div>
+
             <button
-              onClick={() => setWinModal(null)}
+              onClick={() => { setWinModal(null); setPaymentInfo(null); }}
               className="mt-4 text-gray-500 hover:text-white text-xs"
             >
               Dismiss

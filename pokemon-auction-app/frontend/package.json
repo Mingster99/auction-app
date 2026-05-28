@@ -8,6 +8,7 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@livekit/components-react": "^2.9.20",
+    "airwallex-payment-elements": "^1.160.0",
     "axios": "^1.6.7",
     "date-fns": "^3.3.1",
     "html5-qrcode": "^2.3.8",

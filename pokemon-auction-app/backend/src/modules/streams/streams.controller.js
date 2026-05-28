@@ -82,10 +82,12 @@ const streamsController = {
         return res.status(400).json({ message: 'Stream title is required' });
       }
 
-      // Check for existing active stream
+      // Block only if live, or if there's a dangling scheduled stream (created but never started, no scheduled_start_time).
+      // Future-scheduled streams (with scheduled_start_time set) are not a blocker — those are calendar entries.
       const existing = await pool.query(
         `SELECT id FROM streams
-         WHERE host_id = $1 AND status IN ('scheduled', 'live')`,
+         WHERE host_id = $1
+           AND (status = 'live' OR (status = 'scheduled' AND scheduled_start_time IS NULL))`,
         [hostId]
       );
 

@@ -1,4 +1,6 @@
 const pool = require('../../config/database');
+const airwallexService = require('../../utils/airwallexService');
+const { getIO } = require('../../websocket/socketHandler');
 
 const ALLOWED_CARRIERS = ['USPS', 'SingPost', 'DHL', 'FedEx', 'UPS', 'Other'];
 
@@ -156,6 +158,46 @@ exports.markShipped = async (req, res, next) => {
       message: 'Tracking submitted — awaiting admin review',
       invoice: rows[0],
     });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// POST /api/invoices/:id/retry-payment — buyer retries a failed charge
+exports.retryPayment = async (req, res, next) => {
+  const buyerId = req.user.id;
+  const invoiceId = parseInt(req.params.id, 10);
+  if (Number.isNaN(invoiceId)) return res.status(400).json({ message: 'Invalid invoice id' });
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT i.id, i.amount, i.buyer_id, u.airwallex_customer_id, u.airwallex_consent_id
+       FROM invoices i
+       JOIN users u ON u.id = i.buyer_id
+       WHERE i.id = $1 AND i.buyer_id = $2 AND i.status = 'failed'`,
+      [invoiceId, buyerId]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'Invoice not found or not eligible for retry' });
+    }
+    const inv = rows[0];
+    if (!inv.airwallex_consent_id) {
+      return res.status(400).json({ message: 'No saved payment method on file' });
+    }
+
+    const result = await airwallexService.chargeInvoice(inv, inv);
+    if (result.status === 'SUCCEEDED') {
+      await pool.query(
+        `UPDATE invoices SET status = 'paid', paid_at = NOW(), airwallex_payment_intent_id = $1 WHERE id = $2`,
+        [result.id, invoiceId]
+      );
+      try {
+        getIO().to(`user:${buyerId}`).emit('payment-succeeded', { invoiceId, amount: inv.amount });
+      } catch (_) {}
+      return res.json({ message: 'Payment successful', status: 'paid' });
+    }
+
+    return res.json({ message: 'Payment pending — check My Invoices shortly', status: 'pending_webhook' });
   } catch (err) {
     next(err);
   }

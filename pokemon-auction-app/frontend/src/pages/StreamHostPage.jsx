@@ -290,6 +290,7 @@ function StreamHost() {
   const [streamTitle, setStreamTitle] = useState('');
   const [streamDescription, setStreamDescription] = useState('');
   const [streamStatus, setStreamStatus] = useState('idle');
+  const [upcomingStreams, setUpcomingStreams] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -386,19 +387,36 @@ function StreamHost() {
     };
   }, [streamId]);
 
-  // Check for existing live stream on mount
+  // Check for existing live/scheduled streams on mount
   useEffect(() => {
     const checkExistingStream = async () => {
       try {
-        const response = await streamService.getActiveStreams();
+        const response = await streamService.getMyStreams();
         const streams = response.data || response;
-        const myStream = streams.find(
-          (s) => s.host_name === user?.username && s.status === 'live'
+        const now = new Date();
+        const liveStream = streams.find((s) => s.status === 'live');
+        const danglingStream = streams.find(
+          (s) => s.status === 'scheduled' && !s.scheduled_start_time
         );
-        if (myStream) {
-          setStreamId(myStream.id);
-          setStreamTitle(myStream.title);
+        const upcoming = streams
+          .filter(
+            (s) =>
+              s.status === 'scheduled' &&
+              s.scheduled_start_time &&
+              new Date(s.scheduled_start_time) > now
+          )
+          .sort((a, b) => new Date(a.scheduled_start_time) - new Date(b.scheduled_start_time));
+
+        setUpcomingStreams(upcoming);
+
+        if (liveStream) {
+          setStreamId(liveStream.id);
+          setStreamTitle(liveStream.title);
           setStreamStatus('existing');
+        } else if (danglingStream) {
+          setStreamId(danglingStream.id);
+          setStreamTitle(danglingStream.title);
+          setStreamStatus('created');
         }
       } catch (err) {
         console.log('No existing stream found');
@@ -485,6 +503,23 @@ function StreamHost() {
       setStreamStatus('created');
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to create stream');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Go live on a pre-scheduled stream (uses /go-live endpoint which notifies subscribers)
+  const handleGoLiveScheduled = async (scheduledStreamId) => {
+    setLoading(true);
+    setError('');
+    try {
+      const data = await streamService.goLive(scheduledStreamId);
+      const { token, wsUrl } = data.livekit;
+      setStreamId(scheduledStreamId);
+      await joinAsHost(wsUrl, token);
+      setStreamStatus('live');
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to go live');
     } finally {
       setLoading(false);
     }
@@ -587,6 +622,50 @@ function StreamHost() {
         {(error || livekitError || auctionError) && (
           <div className="bg-red-500/20 border border-red-500 text-red-300 p-4 rounded-xl mb-6">
             {error || livekitError || auctionError}
+          </div>
+        )}
+
+        {/* Upcoming scheduled streams — shown above the create form */}
+        {streamStatus === 'idle' && upcomingStreams.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">
+              Your Scheduled Streams
+            </h2>
+            <div className="space-y-3">
+              {upcomingStreams.map((s) => (
+                <div
+                  key={s.id}
+                  className="flex items-center justify-between bg-[#1a1f2e] border border-gray-800 rounded-2xl px-5 py-4"
+                >
+                  <div>
+                    <p className="text-white font-semibold">{s.title}</p>
+                    <p className="text-gray-500 text-sm mt-0.5">
+                      Scheduled:{' '}
+                      {new Date(s.scheduled_start_time).toLocaleString(undefined, {
+                        weekday: 'short',
+                        month: 'short',
+                        day: 'numeric',
+                        hour: 'numeric',
+                        minute: '2-digit',
+                      })}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => handleGoLiveScheduled(s.id)}
+                    disabled={loading}
+                    className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-bold px-4 py-2.5 rounded-xl transition-colors disabled:opacity-50 whitespace-nowrap"
+                  >
+                    <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+                    Go Live Now
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="flex items-center gap-4 my-6">
+              <div className="flex-1 h-px bg-gray-800" />
+              <span className="text-gray-600 text-sm">or create a new stream</span>
+              <div className="flex-1 h-px bg-gray-800" />
+            </div>
           </div>
         )}
 

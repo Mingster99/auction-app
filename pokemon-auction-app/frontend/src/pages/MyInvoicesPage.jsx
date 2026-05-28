@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Navigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import { invoiceService } from '../services/invoiceService';
 import InvoiceDetailModal from '../components/invoices/InvoiceDetailModal';
@@ -76,6 +77,21 @@ export default function MyInvoicesPage() {
   const [to, setTo] = useState('');
   const [offset, setOffset] = useState(0);
   const [openInvoiceId, setOpenInvoiceId] = useState(null);
+  const [retrying, setRetrying] = useState(null); // invoiceId being retried
+
+  const handleRetryPayment = async (e, invoiceId) => {
+    e.stopPropagation();
+    setRetrying(invoiceId);
+    try {
+      await invoiceService.retryPayment(invoiceId);
+      toast.success('Payment successful');
+      load();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Payment failed');
+    } finally {
+      setRetrying(null);
+    }
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -184,6 +200,15 @@ export default function MyInvoicesPage() {
                         <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded ${STATUS_BADGE[inv.status] || 'bg-gray-500/20 text-gray-400'}`}>
                           {STATUS_LABEL[inv.status] || inv.status}
                         </span>
+                        {inv.status === 'failed' && (
+                          <button
+                            onClick={(e) => handleRetryPayment(e, inv.id)}
+                            disabled={retrying === inv.id}
+                            className="ml-2 text-[10px] bg-violet-600/20 hover:bg-violet-600/40 text-violet-400 px-2 py-1 rounded font-bold transition-colors disabled:opacity-50"
+                          >
+                            {retrying === inv.id ? 'Retrying…' : 'Retry'}
+                          </button>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <DeliveryProgress invoice={inv} />

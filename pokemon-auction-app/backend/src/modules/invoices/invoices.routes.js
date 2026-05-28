@@ -6,7 +6,7 @@ const invoicesController = require('./invoices.controller');
 router.use(authMiddleware);
 
 router.get('/my', invoicesController.getMy);
+router.post('/:id/retry-payment', invoicesController.retryPayment);
 router.get('/:id', invoicesController.getOne);
-// markShipped removed — seller shipping replaced by admin pickup flow
 
 module.exports = router;

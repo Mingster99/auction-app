@@ -17,4 +17,9 @@ export const invoiceService = {
     const response = await api.post(`/invoices/${id}/ship`, body);
     return response.data;
   },
+
+  retryPayment: async (id) => {
+    const response = await api.post(`/invoices/${id}/retry-payment`);
+    return response.data;
+  },
 };

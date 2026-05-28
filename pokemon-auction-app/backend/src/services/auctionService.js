@@ -5,8 +5,50 @@ const {
   broadcastAuctionEnd,
   broadcastTimeExtension,
   broadcastAuctionState,
+  getIO,
 } = require('../websocket/socketHandler');
 const { calculatePlatformFee } = require('../utils/fees');
+const airwallexService = require('../utils/airwallexService');
+
+// ── Charge buyer after auction win ───────────────────────
+// Called after COMMIT. Non-blocking fire-and-forget from caller.
+async function chargeAndEmit(invoiceId, invoiceAmount, buyerId) {
+  try {
+    const { rows } = await pool.query(
+      'SELECT airwallex_customer_id, airwallex_consent_id FROM users WHERE id = $1',
+      [buyerId]
+    );
+    const buyer = rows[0];
+    if (!buyer?.airwallex_consent_id) return; // no saved method — nothing to charge
+
+    const result = await airwallexService.chargeInvoice(
+      { id: invoiceId, amount: invoiceAmount },
+      buyer
+    );
+
+    if (result.status === 'SUCCEEDED') {
+      await pool.query(
+        `UPDATE invoices SET status = 'paid', paid_at = NOW(), airwallex_payment_intent_id = $1 WHERE id = $2`,
+        [result.id, invoiceId]
+      );
+      getIO().to(`user:${buyerId}`).emit('payment-succeeded', { invoiceId, amount: invoiceAmount });
+    } else {
+      getIO().to(`user:${buyerId}`).emit('payment-failed', {
+        invoiceId,
+        message: 'Payment failed. Please retry from My Invoices.',
+      });
+    }
+  } catch (err) {
+    const detail = err.response?.data ?? err.message;
+    console.error(`[Charge] Invoice ${invoiceId} charge failed:`, JSON.stringify(detail, null, 2));
+    try {
+      getIO().to(`user:${buyerId}`).emit('payment-failed', {
+        invoiceId,
+        message: 'Payment failed. Please retry from My Invoices.',
+      });
+    } catch (_) {}
+  }
+}
 
 // ── Timer & Rate-Limit State ─────────────────────────────
 const auctionTimers = new Map();    // cardId → timeoutId
@@ -196,8 +238,11 @@ async function executeBuyout(cardId, streamId, buyerId) {
     if (!card.buyout_price) throw new Error('This card has no buyout price');
     if (buyerId === card.seller_id) throw new Error('Seller cannot buyout their own card');
 
-    // has_payment_method check
-    const { rows: buyerRows } = await client.query('SELECT has_payment_method FROM users WHERE id = $1', [buyerId]);
+    // has_payment_method + airwallex_consent_id check (single query for both)
+    const { rows: buyerRows } = await client.query(
+      'SELECT has_payment_method, airwallex_consent_id FROM users WHERE id = $1',
+      [buyerId]
+    );
     if (!buyerRows[0]?.has_payment_method) throw new Error('Payment method required to buy now');
 
     const buyoutAmount = parseFloat(card.buyout_price);
@@ -224,11 +269,15 @@ async function executeBuyout(cardId, streamId, buyerId) {
     );
 
     // Create invoice
-    await client.query(
+    const { rows: invRows } = await client.query(
       `INSERT INTO invoices (buyer_id, seller_id, card_id, stream_id, amount, platform_fee_amount, seller_payout_amount, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')
+       RETURNING id, amount`,
       [buyerId, card.seller_id, cardId, streamId, buyoutAmount, platformFee, sellerPayout]
     );
+    const invoice = invRows[0];
+
+    const autoCharged = !!buyerRows[0]?.airwallex_consent_id;
 
     await client.query('COMMIT');
 
@@ -241,10 +290,20 @@ async function executeBuyout(cardId, streamId, buyerId) {
       winner: card.buyer_username,
       winnerId: buyerId,
       amount: buyoutAmount,
+      autoCharged,
       card,
     };
 
     broadcastAuctionEnd(streamId, resultData);
+
+    // Emit payment event to buyer's personal room, then attempt charge
+    getIO().to(`user:${buyerId}`).emit('payment-required', {
+      invoiceId: invoice.id,
+      amount: invoice.amount,
+      autoCharged,
+    });
+    if (autoCharged) chargeAndEmit(invoice.id, invoice.amount, buyerId);
+
     return resultData;
   } catch (err) {
     await client.query('ROLLBACK');
@@ -332,11 +391,19 @@ async function endAuction(cardId) {
         );
 
         // Create invoice
-        await client.query(
+        const { rows: invRows } = await client.query(
           `INSERT INTO invoices (buyer_id, seller_id, card_id, stream_id, amount, platform_fee_amount, seller_payout_amount, status)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')`,
+           VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')
+           RETURNING id, amount`,
           [card.current_bidder_id, card.seller_id, cardId, card.stream_id, winAmount, platformFee, sellerPayout]
         );
+        const winInvoice = invRows[0];
+
+        const { rows: winBuyerRows } = await client.query(
+          'SELECT airwallex_consent_id FROM users WHERE id = $1',
+          [card.current_bidder_id]
+        );
+        const autoCharged = !!winBuyerRows[0]?.airwallex_consent_id;
 
         resultData = {
           cardId,
@@ -344,6 +411,8 @@ async function endAuction(cardId) {
           winner: card.winner_username,
           winnerId: card.current_bidder_id,
           amount: winAmount,
+          autoCharged,
+          _invoice: winInvoice, // stripped before broadcast
         };
       }
     } else {
@@ -366,9 +435,22 @@ async function endAuction(cardId) {
 
     clearAuctionTimer(cardId);
 
-    // Broadcast to the stream room
+    // Strip internal invoice ref before broadcasting to the stream room
+    const invoice = resultData?._invoice;
+    if (resultData?._invoice) delete resultData._invoice;
+
     if (card.stream_id) {
       broadcastAuctionEnd(card.stream_id, resultData);
+    }
+
+    // Notify buyer and attempt charge if they have a saved payment method
+    if (invoice && resultData?.winnerId) {
+      getIO().to(`user:${resultData.winnerId}`).emit('payment-required', {
+        invoiceId: invoice.id,
+        amount: invoice.amount,
+        autoCharged: resultData.autoCharged,
+      });
+      if (resultData.autoCharged) chargeAndEmit(invoice.id, invoice.amount, resultData.winnerId);
     }
 
     return resultData;

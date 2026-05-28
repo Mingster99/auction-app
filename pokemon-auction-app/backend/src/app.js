@@ -16,6 +16,8 @@ const profileRoutes = require('./modules/profile/profile.routes');
 const invoiceRoutes = require('./modules/invoices/invoices.routes');
 const adminRoutes = require('./modules/admin/admin.routes');
 
+const webhookRoutes = require('./routes/webhooks.routes');
+
 const app = express();
 
 // Middleware
@@ -23,6 +25,10 @@ app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:3000',
   credentials: true
 }));
+
+// Webhooks must be mounted before express.json() to receive raw body for signature verification
+app.use('/api/webhooks', webhookRoutes);
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan('dev'));
